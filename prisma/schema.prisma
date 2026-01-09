@@ -1,0 +1,179 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EnumUserType {
+  ADMIN
+  USUARIO
+}
+
+model User {
+  idUser         String       @id @default(cuid())
+  name           String
+  email          String       @unique
+  password       String
+  cpf            String       @unique
+  phone          String?
+  avatar         String?
+  user_id_create String?
+  user_id_update String?
+  user_id_delete String?
+  dt_delete      DateTime?
+  created        DateTime     @default(now())
+  updated        DateTime?    @updatedAt
+  active         Boolean      @default(false)
+  nivelAcessoId  Int          @default(1)
+  nivel_acesso   Nivel_Acesso @relation(fields: [nivelAcessoId], references: [idNivelAcesso])
+  type           EnumUserType @default(USUARIO)
+  whatsappConfig WhatsAppConfig[]
+  whatsappWebSessions WhatsAppWebSession[]
+
+  errorLogs      ErrorLog[]
+
+  @@index([idUser])
+  @@index([user_id_create])
+  @@index([user_id_update])
+  @@index([user_id_delete])
+}
+
+model Nivel_Acesso {
+  idNivelAcesso Int           @id @default(autoincrement())
+  nome          String
+  descricao     String?
+  users         User[]
+  menus         Menu_Acesso[]
+
+  @@index([idNivelAcesso])
+}
+
+model Menu_Acesso {
+  idMenuAcesso Int            @id @default(autoincrement())
+  nome         String
+  slug         String
+  nivel_acesso Nivel_Acesso[]
+  visualizar   Boolean        @default(false)
+  criar        Boolean        @default(false)
+  editar       Boolean        @default(false)
+  excluir      Boolean        @default(false)
+  relatorio    Boolean        @default(false)
+}
+
+model ErrorLog {
+  id         String   @id @default(cuid())
+  message    String
+  stack      String?
+  method     String?
+  route      String?
+  statusCode Int?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [idUser])
+  userEmail  String?
+  ip         String?
+  userAgent  String?
+  forwardedFor String?
+  seen       Boolean  @default(false)
+  file       String?
+  line       Int?
+  column     Int?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+enum WhatsAppMessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  BUTTON
+  LIST
+}
+
+enum WhatsAppMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsAppMessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model WhatsAppConfig {
+  idConfig        String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [idUser], onDelete: Cascade)
+  accessToken     String
+  phoneNumberId   String
+  businessAccountId String
+  displayName     String?
+  webhookUrl      String?
+  verifyToken     String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  messages        WhatsAppMessage[]
+
+  @@index([userId])
+  @@index([phoneNumberId])
+}
+
+model WhatsAppWebSession {
+  idSession       String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [idUser], onDelete: Cascade)
+  sessionName     String
+  displayName     String?
+  status          String   @default("PENDING") // PENDING, CONNECTED, DISCONNECTED
+  phoneNumber     String?
+  qrCode          String?
+  webhookUrl      String?  // URL do webhook n8n
+  webhookEnabled  Boolean  @default(false) // Se o webhook está ativado
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  messages        WhatsAppMessage[]
+
+  @@unique([userId, sessionName])
+  @@index([userId])
+  @@index([status])
+}
+
+model WhatsAppMessage {
+  idMessage       String   @id @default(cuid())
+  configId        String?
+  config          WhatsAppConfig? @relation(fields: [configId], references: [idConfig], onDelete: Cascade)
+  sessionId       String?
+  session         WhatsAppWebSession? @relation(fields: [sessionId], references: [idSession], onDelete: Cascade)
+  phoneNumber     String
+  contactName     String?
+  contactWaId     String?
+  messageType     WhatsAppMessageType @default(TEXT)
+  direction       WhatsAppMessageDirection
+  status          WhatsAppMessageStatus @default(PENDING)
+  content         String
+  mediaUrl        String?
+  caption         String?
+  externalId      String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([configId])
+  @@index([sessionId])
+  @@index([phoneNumber])
+  @@index([createdAt])
+  @@index([direction])
+}

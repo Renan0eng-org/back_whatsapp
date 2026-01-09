@@ -1,0 +1,890 @@
+{
+    "info": {
+        "_postman_id": "prefeitura-comunidade-api",
+        "name": "Comunidade API - Gerado",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "description": "Coleção gerada automaticamente com endpoints do projeto. Ajuste {{baseUrl}} e {{token}} nas variáveis."
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:4000",
+            "type": "string"
+        },
+        {
+            "key": "token",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "POST /auth/register",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Nome\",\n  \"email\": \"user@example.com\",\n  \"password\": \"senha123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/register",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "register"
+                            ]
+                        },
+                        "description": "Cria um usuário. Validações: nome, email (único), password (min length aplicado via DTO)."
+                    }
+                },
+                {
+                    "name": "POST /auth/login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"senha123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "description": "Autentica usuário. Retorna { access_token, user }."
+                    }
+                },
+                {
+                    "name": "POST /auth/login-web",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"senha123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/login-web",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login-web"
+                            ]
+                        },
+                        "description": "Login que seta cookie 'refresh_token' no response."
+                    }
+                },
+                {
+                    "name": "POST /auth/refresh",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/refresh",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "refresh"
+                            ]
+                        },
+                        "description": "Renova access token a partir do cookie 'refresh_token'."
+                    }
+                },
+                {
+                    "name": "GET /auth/me",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/me",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "me"
+                            ]
+                        },
+                        "description": "Retorna usuário atual baseado no cookie 'refresh_token'."
+                    }
+                },
+                {
+                    "name": "POST /auth/validate",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"token\": \"<token>\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/validate",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "validate"
+                            ]
+                        },
+                        "description": "Valida um token JWT manualmente."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Forms",
+            "item": [
+                {
+                    "name": "GET /forms",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/forms",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms"
+                            ]
+                        },
+                        "description": "Lista formulários ativos."
+                    }
+                },
+                {
+                    "name": "POST /forms",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"title\": \"Título do formulário\",\n  \"questions\": [ { \"text\": \"Pergunta\", \"type\": \"SHORT_TEXT\", \"required\": false, \"options\": [] } ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/forms",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms"
+                            ]
+                        },
+                        "description": "Cria formulário. Validações: title obrigatório, questions array com question.type válido."
+                    }
+                },
+                {
+                    "name": "GET /forms/:id",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/forms/:id",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms",
+                                ":id"
+                            ]
+                        },
+                        "description": "Retorna formulário por id com perguntas."
+                    }
+                },
+                {
+                    "name": "PUT /forms/:id",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"title\": \"Novo título\",\n  \"questions\": []\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/forms/:id",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms",
+                                ":id"
+                            ]
+                        },
+                        "description": "Atualiza formulário (valida via DTO)."
+                    }
+                },
+                {
+                    "name": "DELETE /forms/:id",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/forms/:id",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms",
+                                ":id"
+                            ]
+                        },
+                        "description": "Marca formulário como inativo."
+                    }
+                },
+                {
+                    "name": "POST /forms/:id/responses",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"answers\": [ { \"questionId\": \"uuid\", \"value\": \"opção\", \"values\": [] } ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/forms/:id/responses",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms",
+                                ":id",
+                                "responses"
+                            ]
+                        },
+                        "description": "Submete resposta. O backend usa o token (Bearer ou cookie refresh_token) para associar o usuário; validações aplicadas no DTO."
+                    }
+                },
+                {
+                    "name": "GET /forms/:id/responses",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/forms/:id/responses",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms",
+                                ":id",
+                                "responses"
+                            ]
+                        },
+                        "description": "Lista respostas de um formulário (inclui totalScore calculado no serviço)."
+                    }
+                },
+                {
+                    "name": "GET /forms/responses/list",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/forms/responses/list",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms",
+                                "responses",
+                                "list"
+                            ]
+                        },
+                        "description": "Lista todas as respostas (admin)."
+                    }
+                },
+                {
+                    "name": "GET /forms/response/:responseId",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/forms/response/:responseId",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms",
+                                "response",
+                                ":responseId"
+                            ]
+                        },
+                        "description": "Detalhe de uma response com totalScore e respostas anotadas."
+                    }
+                },
+                {
+                    "name": "GET /forms/users/toAssign",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/forms/users/toAssign",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms",
+                                "users",
+                                "toAssign"
+                            ]
+                        },
+                        "description": "Retorna lista de pacientes possíveis para atribuir a formulários."
+                    }
+                },
+                {
+                    "name": "POST /forms/:id/assign",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{ \"userIds\": [\"id1\",\"id2\"] }"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/forms/:id/assign",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms",
+                                ":id",
+                                "assign"
+                            ]
+                        },
+                        "description": "Atribui usuários a um formulário (admin)."
+                    }
+                },
+                {
+                    "name": "GET /forms/user/my",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/forms/user/my",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "forms",
+                                "user",
+                                "my"
+                            ]
+                        },
+                        "description": "Retorna formulários atribuídos ao usuário autenticado (usa token)."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Acesso (admin)",
+            "item": [
+                {
+                    "name": "GET /admin/acesso/niveis",
+                    "request": {
+                        "method": "GET",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/niveis", "host": ["{{baseUrl}}"], "path": ["admin","acesso","niveis"] },
+                        "description": "Lista níveis de acesso (guard: RefreshTokenGuard)."
+                    }
+                },
+                {
+                    "name": "POST /admin/acesso/niveis",
+                    "request": {
+                        "method": "POST",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+                        "body": { "mode": "raw", "raw": "{ \"nome\": \"Nivel X\", \"descricao\": \"...\" }" },
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/niveis", "host": ["{{baseUrl}}"], "path": ["admin","acesso","niveis"] },
+                        "description": "Cria nível (admin guard)."
+                    }
+                },
+                {
+                    "name": "PUT /admin/acesso/niveis/:id",
+                    "request": {
+                        "method": "PUT",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+                        "body": { "mode": "raw", "raw": "{ \"nome\": \"Nivel edit\" }" },
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/niveis/:id", "host": ["{{baseUrl}}"], "path": ["admin","acesso","niveis",":id"] },
+                        "description": "Atualiza nível (id é inteiro)."
+                    }
+                },
+                {
+                    "name": "DELETE /admin/acesso/niveis/:id (204)",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/niveis/:id", "host": ["{{baseUrl}}"], "path": ["admin","acesso","niveis",":id"] },
+                        "description": "Remove nível (retorna 204)."
+                    }
+                },
+                {
+                    "name": "GET /admin/acesso/menus",
+                    "request": {
+                        "method": "GET",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/menus", "host": ["{{baseUrl}}"], "path": ["admin","acesso","menus"] },
+                        "description": "Lista menus de acesso."
+                    }
+                },
+                {
+                    "name": "POST /admin/acesso/menus",
+                    "request": {
+                        "method": "POST",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+                        "body": { "mode": "raw", "raw": "{ \"nome\": \"Menu\", \"slug\": \"menu-slug\" }" },
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/menus", "host": ["{{baseUrl}}"], "path": ["admin","acesso","menus"] },
+                        "description": "Cria menu."
+                    }
+                },
+                {
+                    "name": "PUT /admin/acesso/menus/:id",
+                    "request": {
+                        "method": "PUT",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+                        "body": { "mode": "raw", "raw": "{ \"nome\": \"Menu edit\" }" },
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/menus/:id", "host": ["{{baseUrl}}"], "path": ["admin","acesso","menus",":id"] },
+                        "description": "Atualiza menu."
+                    }
+                },
+                {
+                    "name": "DELETE /admin/acesso/menus/:id (204)",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/menus/:id", "host": ["{{baseUrl}}"], "path": ["admin","acesso","menus",":id"] },
+                        "description": "Remove menu (204)."
+                    }
+                },
+                {
+                    "name": "GET /admin/acesso/users",
+                    "request": {
+                        "method": "GET",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/users", "host": ["{{baseUrl}}"], "path": ["admin","acesso","users"] },
+                        "description": "Lista usuários (guard)."
+                    }
+                },
+                {
+                    "name": "PATCH /admin/acesso/users/:id/nivel",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+                        "body": { "mode": "raw", "raw": "{ \"nivelAcessoId\": 2 }" },
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/users/:id/nivel", "host": ["{{baseUrl}}"], "path": ["admin","acesso","users",":id","nivel"] },
+                        "description": "Atualiza nível do usuário."
+                    }
+                },
+                {
+                    "name": "PATCH /admin/acesso/users/:id/status",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+                        "body": { "mode": "raw", "raw": "{ \"active\": true }" },
+                        "url": { "raw": "{{baseUrl}}/admin/acesso/users/:id/status", "host": ["{{baseUrl}}"], "path": ["admin","acesso","users",":id","status"] },
+                        "description": "Ativa/desativa usuário."
+                    }
+                }
+            ]
+        },
+            {
+                "name": "Admin Users",
+                "item": [
+                    {
+                        "name": "POST /admin/users",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{token}}"
+                                },
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{ \"name\": \"Nome\", \"email\": \"a@b.com\", \"password\": \"senha\" }"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/admin/users",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "admin",
+                                    "users"
+                                ]
+                            },
+                            "description": "Cria usuário admin/usuário (guard)."
+                        }
+                    },
+                    {
+                        "name": "GET /admin/users",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{token}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/admin/users",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "admin",
+                                    "users"
+                                ]
+                            },
+                            "description": "Lista usuários (guard)."
+                        }
+                    },
+                    {
+                        "name": "GET /admin/users/:id",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{token}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/admin/users/:id",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "admin",
+                                    "users",
+                                    ":id"
+                                ]
+                            },
+                            "description": "Detalhe de usuário por id."
+                        }
+                    },
+                    {
+                        "name": "PUT /admin/users/:id",
+                        "request": {
+                            "method": "PUT",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{token}}"
+                                },
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{ \"name\": \"Nome edit\" }"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/admin/users/:id",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "admin",
+                                    "users",
+                                    ":id"
+                                ]
+                            },
+                            "description": "Atualiza usuário."
+                        }
+                    },
+                    {
+                        "name": "DELETE /admin/users/:id (204)",
+                        "request": {
+                            "method": "DELETE",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{token}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/admin/users/:id",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "admin",
+                                    "users",
+                                    ":id"
+                                ]
+                            },
+                            "description": "Remove usuário (204)."
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Appointments",
+                "item": [
+                    {
+                        "name": "GET /appointments",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{token}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/appointments?doctorId=&patientId=&status=&from=&to=",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "appointments"
+                                ],
+                                "query": [
+                                    {
+                                        "key": "doctorId",
+                                        "value": ""
+                                    },
+                                    {
+                                        "key": "patientId",
+                                        "value": ""
+                                    },
+                                    {
+                                        "key": "status",
+                                        "value": ""
+                                    },
+                                    {
+                                        "key": "from",
+                                        "value": ""
+                                    },
+                                    {
+                                        "key": "to",
+                                        "value": ""
+                                    }
+                                ]
+                            },
+                            "description": "Lista agendamentos. Filtros: doctorId, patientId, status, from, to (ISO dates)."
+                        }
+                    },
+                    {
+                        "name": "POST /appointments",
+                        "request": {
+                            "method": "POST",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{token}}"
+                                },
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{\n  \"doctorId\": \"cjx123\",\n  \"patientId\": \"cjx999\",\n  \"responseId\": \"resp_abc\",\n  \"scheduledAt\": \"2025-11-20T14:00:00.000Z\",\n  \"notes\": \"Encaminhar para cardiologia\"\n}"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/appointments",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "appointments"
+                                ]
+                            },
+                            "description": "Cria agendamento. Validações: doctorId obrigatório, patientId obrigatório (conforme schema), scheduledAt ISO no futuro, opcional checagem de conflito (409)."
+                        }
+                    },
+                    {
+                        "name": "GET /appointments/:id",
+                        "request": {
+                            "method": "GET",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{token}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/appointments/:id",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "appointments",
+                                    ":id"
+                                ]
+                            },
+                            "description": "Retorna agendamento com relações (doctor, patient, response)."
+                        }
+                    },
+                    {
+                        "name": "PUT /appointments/:id",
+                        "request": {
+                            "method": "PUT",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{token}}"
+                                },
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": {
+                                "mode": "raw",
+                                "raw": "{ \"scheduledAt\": \"2025-11-21T14:00:00.000Z\", \"notes\": \"Nova nota\", \"status\": \"CONFIRMED\" }"
+                            },
+                            "url": {
+                                "raw": "{{baseUrl}}/appointments/:id",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "appointments",
+                                    ":id"
+                                ]
+                            },
+                            "description": "Atualiza agendamento. Regras: scheduledAt futuro, alterações de status seguem regras de negócio."
+                        }
+                    },
+                    {
+                        "name": "DELETE /appointments/:id",
+                        "request": {
+                            "method": "DELETE",
+                            "header": [
+                                {
+                                    "key": "Authorization",
+                                    "value": "Bearer {{token}}"
+                                }
+                            ],
+                            "url": {
+                                "raw": "{{baseUrl}}/appointments/:id",
+                                "host": [
+                                    "{{baseUrl}}"
+                                ],
+                                "path": [
+                                    "appointments",
+                                    ":id"
+                                ]
+                            },
+                            "description": "Cancela (soft-delete) agendamento; implementado como marcar status CANCELLED."
+                        }
+                    }
+                ]
+            }
+        ]
+    }

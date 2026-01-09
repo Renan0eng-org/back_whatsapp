@@ -1,0 +1,40 @@
+2026/01/08-19:37:09.870 73a8 Reusing MANIFEST C:\Users\renan\OneDrive\Área de Trabalho\app-gerenciamento\template-back\.wwebjs_auth\session-cmk5vsstn0001f8lw5jyybp40\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/01/08-19:37:09.872 73a8 Recovering log #689
+2026/01/08-19:37:09.881 73a8 Reusing old log C:\Users\renan\OneDrive\Área de Trabalho\app-gerenciamento\template-back\.wwebjs_auth\session-cmk5vsstn0001f8lw5jyybp40\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000689.log 
+2026/01/08-19:37:11.472 70a8 Manual compaction at level-0 from '\x00<\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00=\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/01/08-19:38:45.793 73a8 Level-0 table #704: started
+2026/01/08-19:38:45.856 73a8 Level-0 table #704: 1167430 bytes OK
+2026/01/08-19:38:45.858 73a8 Delete type=0 #689
+2026/01/08-19:42:10.123 73a8 Compacting 1@0 + 1@1 files
+2026/01/08-19:42:10.202 73a8 Generated table #705@0: 27686 keys, 556400 bytes
+2026/01/08-19:42:10.208 73a8 Generated table #706@0: 212 keys, 15759 bytes
+2026/01/08-19:42:10.208 73a8 Compacted 1@0 + 1@1 files => 572159 bytes
+2026/01/08-19:42:10.209 73a8 compacted to: files[ 0 2 13 0 0 0 0 ]
+2026/01/08-19:42:10.209 73a8 Delete type=2 #692
+2026/01/08-19:42:10.210 73a8 Delete type=2 #704
+2026/01/08-19:42:19.878 73a8 Compacting 1@1 + 11@2 files
+2026/01/08-19:42:20.032 73a8 Generated table #707@1: 89296 keys, 2241239 bytes
+2026/01/08-19:42:20.180 73a8 Generated table #708@1: 54222 keys, 2241632 bytes
+2026/01/08-19:42:20.300 73a8 Generated table #709@1: 35541 keys, 2197740 bytes
+2026/01/08-19:42:20.382 73a8 Generated table #710@1: 3259 keys, 2154705 bytes
+2026/01/08-19:42:20.433 73a8 Generated table #711@1: 3240 keys, 2153249 bytes
+2026/01/08-19:42:20.491 73a8 Generated table #712@1: 5476 keys, 2158501 bytes
+2026/01/08-19:42:20.647 73a8 Generated table #713@1: 33785 keys, 2252900 bytes
+2026/01/08-19:42:20.752 73a8 Generated table #714@1: 27076 keys, 2200751 bytes
+2026/01/08-19:42:20.854 73a8 Generated table #715@1: 66437 keys, 2206584 bytes
+2026/01/08-19:42:20.987 73a8 Generated table #716@1: 100762 keys, 2249630 bytes
+2026/01/08-19:42:21.012 73a8 Generated table #717@1: 14593 keys, 328061 bytes
+2026/01/08-19:42:21.012 73a8 Compacted 1@1 + 11@2 files => 22384992 bytes
+2026/01/08-19:42:21.013 73a8 compacted to: files[ 0 1 13 0 0 0 0 ]
+2026/01/08-19:42:21.014 73a8 Delete type=2 #686
+2026/01/08-19:42:21.014 73a8 Delete type=2 #687
+2026/01/08-19:42:21.014 73a8 Delete type=2 #693
+2026/01/08-19:42:21.014 73a8 Delete type=2 #694
+2026/01/08-19:42:21.015 73a8 Delete type=2 #695
+2026/01/08-19:42:21.015 73a8 Delete type=2 #696
+2026/01/08-19:42:21.015 73a8 Delete type=2 #697
+2026/01/08-19:42:21.015 73a8 Delete type=2 #698
+2026/01/08-19:42:21.015 73a8 Delete type=2 #699
+2026/01/08-19:42:21.015 73a8 Delete type=2 #700
+2026/01/08-19:42:21.015 73a8 Delete type=2 #701
+2026/01/08-19:42:21.015 73a8 Delete type=2 #705

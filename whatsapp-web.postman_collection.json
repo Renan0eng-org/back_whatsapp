@@ -1,0 +1,251 @@
+{
+	"info": {
+		"_postman_id": "whatsapp-web-collection",
+		"name": "WhatsApp Web API",
+		"description": "Coleção de rotas para WhatsApp Web Sessions",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Sessions",
+			"item": [
+				{
+					"name": "Create Session",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sessionName\": \"my-session\",\n  \"displayName\": \"My WhatsApp Session\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/whatsapp/web/session",
+							"host": ["{{base_url}}"],
+							"path": ["whatsapp", "web", "session"]
+						},
+						"description": "Cria uma nova sessão do WhatsApp Web e retorna o QR code"
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Sessions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/whatsapp/web/sessions",
+							"host": ["{{base_url}}"],
+							"path": ["whatsapp", "web", "sessions"]
+						},
+						"description": "Lista todas as sessões do usuário autenticado"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Session by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/whatsapp/web/session/{{session_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["whatsapp", "web", "session", "{{session_id}}"]
+						},
+						"description": "Busca uma sessão específica por ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Session",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/whatsapp/web/session/{{session_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["whatsapp", "web", "session", "{{session_id}}"]
+						},
+						"description": "Deleta uma sessão e desconecta do WhatsApp"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Messages",
+			"item": [
+				{
+					"name": "Send Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"5544991234567\",\n  \"message\": \"Olá! Esta é uma mensagem de teste.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/whatsapp/web/send?sessionId={{session_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["whatsapp", "web", "send"],
+							"query": [
+								{
+									"key": "sessionId",
+									"value": "{{session_id}}"
+								}
+							]
+						},
+						"description": "Envia uma mensagem através do WhatsApp Web"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Messages by Contact",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/whatsapp/web/messages/{{phone}}?sessionId={{session_id}}&limit=10&offset=0",
+							"host": ["{{base_url}}"],
+							"path": ["whatsapp", "web", "messages", "{{phone}}"],
+							"query": [
+								{
+									"key": "sessionId",
+									"value": "{{session_id}}"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "offset",
+									"value": "0"
+								}
+							]
+						},
+						"description": "Busca mensagens de um contato específico com paginação"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Conversations",
+			"item": [
+				{
+					"name": "Get Conversations",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/whatsapp/web/conversations?sessionId={{session_id}}&limit=10",
+							"host": ["{{base_url}}"],
+							"path": ["whatsapp", "web", "conversations"],
+							"query": [
+								{
+									"key": "sessionId",
+									"value": "{{session_id}}"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Lista as conversas recentes com fotos de perfil"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Contact Profile Picture",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/whatsapp/web/contact/{{phone}}/profile-pic?sessionId={{session_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["whatsapp", "web", "contact", "{{phone}}", "profile-pic"],
+							"query": [
+								{
+									"key": "sessionId",
+									"value": "{{session_id}}"
+								}
+							]
+						},
+						"description": "Busca a foto de perfil de um contato"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "seu_token_jwt_aqui",
+			"type": "string"
+		},
+		{
+			"key": "session_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "phone",
+			"value": "5544991234567",
+			"type": "string"
+		}
+	]
+}
