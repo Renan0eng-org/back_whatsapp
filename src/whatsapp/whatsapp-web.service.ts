@@ -166,7 +166,7 @@ export class WhatsAppWebService implements OnModuleInit {
     try {
       const result = await client.sendMessage(chatId, message)
 
-      await this.prisma.whatsAppMessage.create({
+      const savedMessage = await this.prisma.whatsAppMessage.create({
         data: {
           sessionId,
           phoneNumber: sanitizedPhone,
@@ -176,6 +176,28 @@ export class WhatsAppWebService implements OnModuleInit {
           content: message,
           externalId: result.id.id,
         },
+      })
+
+      // Emite mensagem enviada via WebSocket
+      this.whatsappGateway.emitNewMessage(sessionId, {
+        id: savedMessage.idMessage,
+        phoneNumber: savedMessage.phoneNumber,
+        contactName: savedMessage.contactName,
+        messageType: savedMessage.messageType,
+        direction: savedMessage.direction,
+        status: savedMessage.status,
+        content: savedMessage.content,
+        mediaUrl: savedMessage.mediaUrl,
+        createdAt: savedMessage.createdAt.toISOString(),
+      })
+
+      // Atualiza conversa
+      this.whatsappGateway.emitConversationUpdate(sessionId, {
+        phoneNumber: sanitizedPhone,
+        contactName: null,
+        lastMessage: message,
+        lastMessageTime: new Date().toISOString(),
+        unreadCount: 0,
       })
 
       return { id: result.id.id, status: 'SENT' }
@@ -318,15 +340,25 @@ export class WhatsAppWebService implements OnModuleInit {
               },
             });
 
-            // Emite via WebSocket
-            this.whatsappGateway.emitNewMessage(sessionId, savedMessage);
+            // Emite via WebSocket (serializa para JSON)
+            this.whatsappGateway.emitNewMessage(sessionId, {
+              id: savedMessage.idMessage,
+              phoneNumber: savedMessage.phoneNumber,
+              contactName: savedMessage.contactName,
+              messageType: savedMessage.messageType,
+              direction: savedMessage.direction,
+              status: savedMessage.status,
+              content: savedMessage.content,
+              mediaUrl: savedMessage.mediaUrl,
+              createdAt: savedMessage.createdAt.toISOString(),
+            });
 
             // Atualiza conversa
             this.whatsappGateway.emitConversationUpdate(sessionId, {
               phoneNumber: messageData.phoneNumber,
               contactName: messageData.contactName,
               lastMessage: messageData.content,
-              lastMessageTime: messageData.createdAt,
+              lastMessageTime: messageData.createdAt.toISOString(),
               unreadCount: 1,
             });
 

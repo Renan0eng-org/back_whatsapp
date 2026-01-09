@@ -1,4 +1,4 @@
-name: Deploy Backend Prefeitura
+name: Deploy Backend WhatsApp
 
 on:
   push:
@@ -18,17 +18,18 @@ jobs:
 
       - name: Build e push da imagem
         run: |
-          docker build -t devnardi/example:latest .
-          docker push devnardi/example:latest
+          docker build -t devnardi/back-whatsapp:latest .
+          docker push devnardi/back-whatsapp:latest
 
       - name: Subindo novo container com variáveis
         run: |
-            docker rm -f example || true
-            docker pull devnardi/example:latest
-            docker run -d \
-            --name example \
-            -p 4000:4000 \
-            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            -e JWT_ACCESS_SECRET="${{ secrets.JWT_ACCESS_SECRET }}" \
-            -e CORS="https://example.com,http://localhost:3000" \
-            devnardi/example:latest
+          docker rm -f back-whatsapp || true
+          docker pull devnardi/back-whatsapp:latest
+          docker run -d \
+            --name back-whatsapp \
+            -p 4040:4000 \
+            --network n8n_net \
+            -e DATABASE_URL="${{ secrets.DATABASE_URL_WHATS }}" \
+            -e CORS="https://whatsapp.renannardi.com" \
+            -e CHROME_PATH="/usr/bin/chromium-browser" \
+            devnardi/back-whatsapp:latest

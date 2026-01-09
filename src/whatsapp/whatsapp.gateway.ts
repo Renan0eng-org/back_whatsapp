@@ -49,7 +49,8 @@ export class WhatsAppGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.sessionClients.get(sessionId)!.add(client.id);
     client.join(`session:${sessionId}`);
     
-    console.log(`Cliente ${client.id} inscrito na sessão ${sessionId}`);
+    console.log(`✅ Cliente ${client.id} inscrito na sessão ${sessionId}`);
+    console.log(`📊 Total de clientes na sessão ${sessionId}: ${this.sessionClients.get(sessionId)!.size}`);
     
     return { success: true, message: `Inscrito na sessão ${sessionId}` };
   }
@@ -69,6 +70,9 @@ export class WhatsAppGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   // Método para enviar nova mensagem para os clientes
   emitNewMessage(sessionId: string, message: any) {
+    console.log(`📤 Emitindo new_message para sessão ${sessionId}:`, message);
+    const clientsCount = this.sessionClients.get(sessionId)?.size || 0;
+    console.log(`👥 Clientes inscritos na sessão ${sessionId}: ${clientsCount}`);
     this.server.to(`session:${sessionId}`).emit('new_message', message);
   }
 
@@ -82,6 +86,7 @@ export class WhatsAppGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   // Método para notificar atualização em conversa
   emitConversationUpdate(sessionId: string, conversation: any) {
+    console.log(`📤 Emitindo conversation_update para sessão ${sessionId}:`, conversation);
     this.server.to(`session:${sessionId}`).emit('conversation_update', conversation);
   }
 }
