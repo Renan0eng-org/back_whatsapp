@@ -477,6 +477,97 @@ export class FinancasService {
     };
   }
 
+  // ===== SERIES FOR CHART =====
+
+  async getFinancialSeries(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Fetch all transactions in range
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        userId,
+        date: { gte: start, lte: end },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    // Fetch all loans for this user with their payments
+    const loans = await this.prisma.loan.findMany({
+      where: { userId },
+      include: {
+        payments: true,
+      },
+    });
+
+    // Build day-by-day map
+    const dayMap: Record<string, { income: number; expenses: number; balance: number; unpaid: number }> = {};
+
+    // Initialize with zero
+    const current = new Date(start);
+    while (current <= end) {
+      const key = current.toISOString().slice(0, 10);
+      dayMap[key] = { income: 0, expenses: 0, balance: 0, unpaid: 0 };
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    // Compute baseline balance before start date (transactions before start)
+    const transactionsBefore = await this.prisma.transaction.findMany({
+      where: {
+        userId,
+        date: { lt: start },
+      },
+    });
+    let baseBalance = transactionsBefore.reduce((acc, t) => acc + t.value, 0);
+
+    // Fill transaction data per day
+    let runningBalance = baseBalance;
+    for (const dayKey of Object.keys(dayMap).sort()) {
+      const dayTrans = transactions.filter((t) => t.date.toISOString().slice(0, 10) === dayKey);
+      const dayIncome = dayTrans.filter((t) => t.value > 0).reduce((sum, t) => sum + t.value, 0);
+      const dayExpenses = dayTrans.filter((t) => t.value < 0).reduce((sum, t) => sum + Math.abs(t.value), 0);
+      runningBalance += dayIncome - dayExpenses;
+      dayMap[dayKey].income = dayIncome;
+      dayMap[dayKey].expenses = dayExpenses;
+      dayMap[dayKey].balance = runningBalance;
+    }
+
+    // Calculate unpaid loans outstanding as of each day
+    for (const dayKey of Object.keys(dayMap).sort()) {
+      const asOfDate = new Date(dayKey + 'T23:59:59Z');
+      let unpaidTotal = 0;
+
+      for (const loan of loans) {
+        // Only consider loans that existed by this date (dueDate <= asOfDate or createdAt <= asOfDate)
+        if (loan.createdAt <= asOfDate) {
+          const paidAmount = loan.payments
+            .filter((p) => p.createdAt <= asOfDate)
+            .reduce((sum, p) => sum + p.amount, 0);
+          const outstanding = loan.amount - paidAmount;
+          if (outstanding > 0) {
+            unpaidTotal += outstanding;
+          }
+        }
+      }
+      dayMap[dayKey].unpaid = unpaidTotal;
+    }
+
+    // Convert to array
+    return Object.keys(dayMap)
+      .sort()
+      .map((date) => ({
+        date,
+        income: dayMap[date].income,
+        expenses: dayMap[date].expenses,
+        balance: dayMap[date].balance,
+        unpaid: dayMap[date].unpaid,
+      }));
+  }
+
   // ===== SEED DEFAULT CATEGORIES =====
 
   async seedDefaultCategories() {

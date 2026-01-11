@@ -161,4 +161,17 @@ export class FinancasController {
       endDate,
     );
   }
+
+  @Get('series')
+  async getFinancialSeries(
+    @GetUser() user: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.financasService.getFinancialSeries(
+      user.idUser,
+      startDate,
+      endDate,
+    );
+  }
 }
