@@ -76,12 +76,20 @@ export class FinancasController {
     @Query('endDate') endDate?: string,
     @Query('categoryId') categoryId?: string,
     @Query('isClassified') isClassified?: string,
+    @Query('search') search?: string,
+    @Query('minValue') minValue?: string,
+    @Query('maxValue') maxValue?: string,
+    @Query('type') type?: string,
   ) {
     const filters = {
       startDate,
       endDate,
       categoryId,
       isClassified: isClassified === 'true' ? true : isClassified === 'false' ? false : undefined,
+      search,
+      minValue: minValue ? parseFloat(minValue) : undefined,
+      maxValue: maxValue ? parseFloat(maxValue) : undefined,
+      type,
     };
 
     return this.financasService.getTransactions(user.idUser, filters);
@@ -99,6 +107,14 @@ export class FinancasController {
     @Body() dto: ClassifyTransactionDto,
   ) {
     return this.financasService.classifyTransaction(id, user.idUser, dto);
+  }
+
+  @Put('transactions/:id/unclassify')
+  async unclassifyTransaction(
+    @GetUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.financasService.unclassifyTransaction(id, user.idUser);
   }
 
   @Delete('transactions/:id')

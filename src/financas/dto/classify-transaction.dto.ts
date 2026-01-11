@@ -25,8 +25,9 @@ export class ClassifyTransactionDto {
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  linkedLoanIds?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => LoanPaymentDto)
+  loanPayments?: LoanPaymentDto[];
 }
 
 export class LoanItemDto {
@@ -40,6 +41,18 @@ export class LoanItemDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class LoanPaymentDto {
+  @IsString()
+  loanId: string;
+
+  @IsNumber()
+  amount: number; // Quanto foi pago para esse empréstimo nessa transação
 
   @IsOptional()
   @IsString()

@@ -88,19 +88,22 @@ export class FinancasService {
   async getTransactions(
     userId: string,
     filters?: {
-      startDate?: string;
-      endDate?: string;
-      categoryId?: string;
-      isClassified?: boolean;
+        startDate?: string;
+        endDate?: string;
+        categoryId?: string;
+        isClassified?: boolean;
+        search?: string;
+        minValue?: number;
+        maxValue?: number;
+        type?: string; // income | expense | all
     },
   ) {
     const where: any = { userId };
 
-    if (filters?.startDate && filters?.endDate) {
-      where.date = {
-        gte: new Date(filters.startDate),
-        lte: new Date(filters.endDate),
-      };
+    if (filters?.startDate || filters?.endDate) {
+      where.date = {};
+      if (filters.startDate) where.date.gte = new Date(filters.startDate);
+      if (filters.endDate) where.date.lte = new Date(filters.endDate);
     }
 
     if (filters?.categoryId) {
@@ -111,6 +114,28 @@ export class FinancasService {
       where.isClassified = filters.isClassified;
     }
 
+    if (filters?.minValue !== undefined || filters?.maxValue !== undefined) {
+      where.value = where.value || {};
+      if (filters.minValue !== undefined) where.value.gte = filters.minValue;
+      if (filters.maxValue !== undefined) where.value.lte = filters.maxValue;
+    }
+
+    if (filters?.type === 'income') {
+      where.value = { ...(where.value || {}), gt: 0 };
+    } else if (filters?.type === 'expense') {
+      where.value = { ...(where.value || {}), lt: 0 };
+    }
+
+    if (filters?.search) {
+      const term = filters.search;
+      where.OR = [
+        { description: { contains: term, mode: 'insensitive' } },
+        { notes: { contains: term, mode: 'insensitive' } },
+        { externalId: { contains: term, mode: 'insensitive' } },
+        { aiSuggestion: { contains: term, mode: 'insensitive' } },
+      ];
+    }
+
     return this.prisma.transaction.findMany({
       where,
       include: { category: true },
@@ -118,6 +143,28 @@ export class FinancasService {
     });
   }
 
+    async unclassifyTransaction(transactionId: string, userId: string) {
+      // Ensure transaction belongs to user
+      await this.getTransactionById(transactionId, userId);
+
+      // Remove vínculos de pagamento com empréstimos
+      await this.prisma.loanPayment.deleteMany({
+        where: { transactionId: transactionId },
+      });
+
+      // Reset classificação e categoria
+      const updated = await this.prisma.transaction.update({
+        where: { idTransaction: transactionId },
+        data: {
+          categoryId: null,
+          isClassified: false,
+          notes: null,
+        },
+        include: { category: true },
+      });
+
+      return updated;
+    }
   async getTransactionById(id: string, userId: string) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { idTransaction: id },
@@ -155,17 +202,28 @@ export class FinancasService {
       throw new BadRequestException('Categoria não disponível');
     }
 
-    // Validate linked loans if provided
-    if (dto.linkedLoanIds && dto.linkedLoanIds.length > 0) {
-      for (const loanId of dto.linkedLoanIds) {
+    // Validate loan payments if provided
+    if (dto.loanPayments && dto.loanPayments.length > 0) {
+      // Validar que o total dos pagamentos não excede o valor da transação
+      const totalPayments = dto.loanPayments.reduce((sum, p) => sum + p.amount, 0);
+      if (totalPayments > transaction.value) {
+        throw new BadRequestException(
+          `Total de pagamentos (${totalPayments}) não pode exceder o valor da transação (${transaction.value})`
+        );
+      }
+
+      for (const payment of dto.loanPayments) {
         const loan = await this.prisma.loan.findUnique({
-          where: { idLoan: loanId },
+          where: { idLoan: payment.loanId },
         });
         if (!loan || loan.userId !== userId) {
-          throw new NotFoundException('Empréstimo não encontrado');
+          throw new NotFoundException(`Empréstimo ${payment.loanId} não encontrado`);
         }
         if (!loan.isPaid) {
-          throw new BadRequestException('Apenas empréstimos pagos podem ser linkados');
+          throw new BadRequestException('Apenas empréstimos pagos podem receber pagamentos');
+        }
+        if (payment.amount <= 0) {
+          throw new BadRequestException(`Valor de pagamento deve ser maior que zero`);
         }
       }
     }
@@ -180,14 +238,16 @@ export class FinancasService {
       include: { category: true },
     });
 
-    // Link paid loans to this transaction
-    if (dto.linkedLoanIds && dto.linkedLoanIds.length > 0) {
+    // Create loan payments records if provided
+    if (dto.loanPayments && dto.loanPayments.length > 0) {
       await this.prisma.$transaction(
-        dto.linkedLoanIds.map((loanId) =>
-          this.prisma.loan.update({
-            where: { idLoan: loanId },
+        dto.loanPayments.map((payment) =>
+          this.prisma.loanPayment.create({
             data: {
-              paymentTransactionId: transactionId,
+              loanId: payment.loanId,
+              transactionId: transactionId,
+              amount: payment.amount,
+              notes: payment.notes,
             },
           })
         )
@@ -248,15 +308,33 @@ export class FinancasService {
   }
 
   async getPaidLoans(userId: string) {
-    return this.prisma.loan.findMany({
+    const loans = await this.prisma.loan.findMany({
       where: {
         userId,
         isPaid: true,
       },
       include: {
         category: true,
+        payments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            transaction: true,
+          },
+        },
       },
       orderBy: { paidDate: 'desc' },
+    });
+
+    // Calcular saldo pendente de cada empréstimo
+    return loans.map((loan) => {
+      const totalPaid = loan.payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const remainingBalance = loan.amount - totalPaid;
+
+      return {
+        ...loan,
+        totalPaid,
+        remainingBalance,
+      };
     });
   }
 

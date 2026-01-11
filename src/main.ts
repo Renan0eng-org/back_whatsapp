@@ -13,7 +13,11 @@ dotenv.config();
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.useGlobalPipes(new ValidationPipe());
+  // Habilita transformação para converter strings (ex.: datas) para tipos do DTO
+  app.useGlobalPipes(new ValidationPipe({
+    transform: true,
+    transformOptions: { enableImplicitConversion: true },
+  }));
 
   // Suporta uma ou várias origens separadas por vírgula na variável CORS
   const corsEnv = process.env.CORS;

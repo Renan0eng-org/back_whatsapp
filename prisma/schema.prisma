@@ -229,6 +229,7 @@ model Transaction {
   aiSuggestion    String?  // Sugestão de categoria da IA (para futuro uso do N8N)
   notes           String?
   metadata        Json?    // Para armazenar dados adicionais do CSV
+  loanPayments    LoanPayment[] // Pagamentos de empréstimos associados a essa transação
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -248,12 +249,12 @@ model Loan {
   categoryId          String?
   category            ExpenseCategory? @relation(fields: [categoryId], references: [idCategory], onDelete: SetNull)
   transactionId       String?  // ID da transação que originou o empréstimo (saída)
-  paymentTransactionId String? // ID da transação de pagamento (entrada)
   dueDate             DateTime // Data de previsão de pagamento
   description         String?
   isPaid              Boolean  @default(false)
   paidDate            DateTime?
   notes               String?
+  payments            LoanPayment[] // Histórico de pagamentos parciais
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -261,5 +262,20 @@ model Loan {
   @@index([categoryId])
   @@index([dueDate])
   @@index([isPaid])
+}
+
+model LoanPayment {
+  idPayment           String   @id @default(cuid())
+  loanId              String
+  loan                Loan     @relation(fields: [loanId], references: [idLoan], onDelete: Cascade)
+  transactionId       String   // ID da transação de entrada (movimentação)
+  transaction         Transaction @relation(fields: [transactionId], references: [idTransaction], onDelete: Cascade)
+  amount              Float    // Quanto foi pago nessa transação para esse empréstimo
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([loanId])
+  @@index([transactionId])
 }
 

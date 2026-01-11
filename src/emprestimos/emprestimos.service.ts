@@ -133,12 +133,30 @@ export class EmprrestimosService {
       where.isPaid = filters.isPaid;
     }
 
-    return this.prisma.loan.findMany({
+    const loans = await this.prisma.loan.findMany({
       where,
       include: {
         category: true,
+        payments: {
+          include: {
+            transaction: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
       orderBy: { dueDate: 'asc' },
+    });
+
+    // Calcular total pago e saldo pendente para cada empréstimo
+    return loans.map((loan) => {
+      const totalPaid = loan.payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const remainingBalance = loan.amount - totalPaid;
+
+      return {
+        ...loan,
+        totalPaid,
+        remainingBalance,
+      };
     });
   }
 
@@ -226,17 +244,37 @@ export class EmprrestimosService {
   async getLoansSummary(userId: string) {
     const loans = await this.prisma.loan.findMany({
       where: { userId },
+      include: {
+        payments: true,
+      },
     });
 
-    const totalLoaned = loans
-      .filter(l => !l.isPaid)
-      .reduce((sum, l) => sum + l.amount, 0);
+    // Calcula saldo pendente por empréstimo considerando pagamentos
+    const loansWithBalance = loans.map((loan) => {
+      const paid = loan.payments?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
+      const remaining = Math.max(loan.amount - paid, 0);
+      return { loan, paid, remaining };
+    });
 
-    const totalPaid = loans
-      .filter(l => l.isPaid)
-      .reduce((sum, l) => sum + l.amount, 0);
+    const totalLoaned = loansWithBalance
+      .filter(({ loan }) => !loan.isPaid)
+      .reduce((sum, { remaining }) => sum + remaining, 0);
+
+    const totalPaid = loansWithBalance
+      .filter(({ loan }) => loan.isPaid)
+      .reduce((sum, { paid }) => sum + paid, 0);
+
+    // Empréstimos marcados como pagos mas sem vínculos de pagamento suficientes
+    // (sem registros em LoanPayment ou com soma de pagamentos menor que o valor do empréstimo)
+    const unlinkedLoans = loansWithBalance.filter(({ loan, paid }) => loan.isPaid && paid < loan.amount);
+    const unlinkedAmount = unlinkedLoans.reduce((sum, { remaining, loan, paid }) => {
+      const missing = Math.max(loan.amount - paid, 0);
+      return sum + missing;
+    }, 0);
+    const unlinkedCount = unlinkedLoans.length;
 
     const now = new Date();
+    const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     
     const overdueLoans = await this.prisma.loan.findMany({
       where: {
@@ -248,9 +286,16 @@ export class EmprrestimosService {
       },
       include: {
         category: true,
+        payments: true,
       },
       orderBy: { dueDate: 'asc' },
     });
+
+    const overdueAmount = overdueLoans.reduce((sum, l) => {
+      const paid = l.payments?.reduce((pSum, p) => pSum + p.amount, 0) ?? 0;
+      return sum + Math.max(l.amount - paid, 0);
+    }, 0);
+    const overdueCount = overdueLoans.length;
 
     const upcomingPayments = await this.prisma.loan.findMany({
       where: {
@@ -258,14 +303,20 @@ export class EmprrestimosService {
         isPaid: false,
         dueDate: {
           gte: now,
-          lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          lte: sevenDaysFromNow,
         },
       },
       include: {
         category: true,
+        payments: true,
       },
       orderBy: { dueDate: 'asc' },
     });
+
+    const upcomingAmount7Days = upcomingPayments.reduce((sum, l) => {
+      const paid = l.payments?.reduce((pSum, p) => pSum + p.amount, 0) ?? 0;
+      return sum + Math.max(l.amount - paid, 0);
+    }, 0);
 
     return {
       totalLoaned,
@@ -274,6 +325,11 @@ export class EmprrestimosService {
       paidLoans: loans.filter(l => l.isPaid).length,
       overdueLoans,
       upcomingPayments,
+      overdueAmount,
+      overdueCount,
+      upcomingAmount7Days,
+      unlinkedAmount,
+      unlinkedCount,
     };
   }
 }
