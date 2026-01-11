@@ -691,31 +691,7 @@ export class WhatsAppWebService implements OnModuleInit {
         return; // Webhook não configurado ou desabilitado
       }
 
-      // Busca as últimas 10 mensagens do contato
-      const lastMessages = await this.prisma.whatsAppMessage.findMany({
-        where: {
-          sessionId,
-          phoneNumber: phone,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      });
-
-      // Inverte para mostrar em ordem cronológica (mais antigas primeiro) e apenas mensagens de texto
-      const messagesData = lastMessages.reverse().filter(msg => msg.messageType === 'TEXT').map(msg => ({
-        id: msg.idMessage,
-        role: msg.direction === 'INBOUND' ? 'user' : 'assistant',
-        phoneNumber: msg.phoneNumber,
-        contactName: msg.contactName,
-        messageType: msg.messageType,
-        direction: msg.direction,
-        status: msg.status,
-        content: msg.content,
-        mediaUrl: msg.mediaUrl,
-        createdAt: msg.createdAt.toISOString(),
-      }));
-
-      this.logger.log(`Enviando mensagem e ${messagesData.length} histórico para webhook n8n: ${session.webhookUrl}`);
+      this.logger.log(`Enviando mensagem para webhook n8n: ${session.webhookUrl}`);
 
       const response = await fetch(session.webhookUrl, {
         method: 'POST',
@@ -726,7 +702,6 @@ export class WhatsAppWebService implements OnModuleInit {
           phone,
           message,
           sessionId,
-          recentMessages: messagesData,
         }),
       });
 

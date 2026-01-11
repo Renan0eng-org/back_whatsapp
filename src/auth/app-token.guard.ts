@@ -16,7 +16,7 @@ export class AppTokenGuard implements CanActivate {
     ) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        const request = context.switchToHttp().getRequest<Request>()
+        const request = context.switchToHttp().getRequest<Request & { user?: any }>()
         const response = context.switchToHttp().getResponse<Response>()
 
         let token: string | undefined
@@ -38,6 +38,7 @@ export class AppTokenGuard implements CanActivate {
             if (!user || !user.active)
                 throw new UnauthorizedException('Usuário inválido ou inativo.')
 
+            request.user = user
             request['refreshTokenPayload'] = payload
             return true
         } catch {

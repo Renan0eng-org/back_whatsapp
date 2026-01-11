@@ -16,7 +16,7 @@ export class RefreshTokenGuard implements CanActivate {
     ) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        const request = context.switchToHttp().getRequest<Request>();
+        const request = context.switchToHttp().getRequest<Request & { user?: any }>();
         const token = request.cookies['refresh_token']; 
 
         if (!token) {
@@ -33,6 +33,7 @@ export class RefreshTokenGuard implements CanActivate {
                 throw new UnauthorizedException('Usuário associado ao token inválido ou inativo.');
             }
 
+            request.user = user;
             request['refreshTokenPayload'] = payload;
 
         } catch (err) {

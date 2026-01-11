@@ -1,5 +1,6 @@
 // src/auth/get-user.decorator.ts
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { createParamDecorator, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Request } from 'express';
 import { User } from 'generated/prisma';
 
 /**
@@ -9,7 +10,12 @@ import { User } from 'generated/prisma';
  */
 export const GetUser = createParamDecorator(
     (_data: unknown, ctx: ExecutionContext): User => {
-        const request = ctx.switchToHttp().getRequest();
+        const request = ctx.switchToHttp().getRequest<Request & { user?: User }>();
+
+        if (!request.user) {
+            throw new UnauthorizedException('Usuário não autenticado');
+        }
+
         return request.user;
     },
 );
