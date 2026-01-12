@@ -318,6 +318,23 @@ export class EmprrestimosService {
       return sum + Math.max(l.amount - paid, 0);
     }, 0);
 
+    // Agrupar por categoria (somente empréstimos pendentes)
+    const loansWithCategory = await this.prisma.loan.findMany({
+      where: { userId, isPaid: false },
+      include: {
+        category: true,
+        payments: true,
+      },
+    });
+
+    const byCategory: Record<string, number> = {};
+    for (const loan of loansWithCategory) {
+      const categoryName = loan.category?.name || 'Sem categoria';
+      const paid = loan.payments?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
+      const remaining = Math.max(loan.amount - paid, 0);
+      byCategory[categoryName] = (byCategory[categoryName] || 0) + remaining;
+    }
+
     return {
       totalLoaned,
       totalPaid,
@@ -330,6 +347,7 @@ export class EmprrestimosService {
       upcomingAmount7Days,
       unlinkedAmount,
       unlinkedCount,
+      byCategory,
     };
   }
 }
