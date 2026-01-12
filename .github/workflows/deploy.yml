@@ -30,6 +30,6 @@ jobs:
             -p 4040:4000 \
             --network n8n_net \
             -e DATABASE_URL="${{ secrets.DATABASE_URL_WHATS }}" \
-            -e CORS="https://whatsapp.renannardi.com" \
+            -e CORS="https://renannardi.com" \
             -e CHROME_PATH="/usr/bin/chromium-browser" \
             devnardi/back-whatsapp:latest
