@@ -693,6 +693,30 @@ export class WhatsAppWebService implements OnModuleInit {
 
       this.logger.log(`Enviando mensagem para webhook n8n: ${session.webhookUrl}`);
 
+      // Busca as últimas 5 mensagens da conversa para enviar contexto ao n8n
+      const lastMessages = await this.prisma.whatsAppMessage.findMany({
+        where: { sessionId, phoneNumber: phone },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          idMessage: true,
+          direction: true,
+          messageType: true,
+          content: true,
+          createdAt: true,
+        },
+      });
+
+      const conversationHistory = lastMessages
+        .reverse() // Ordena do mais antigo para o mais recente
+        .map(msg => ({
+          id: msg.idMessage,
+          direction: msg.direction,
+          messageType: msg.messageType,
+          content: msg.content,
+          createdAt: msg.createdAt.toISOString(),
+        }));
+
       const response = await fetch(session.webhookUrl, {
         method: 'POST',
         headers: {
@@ -702,6 +726,7 @@ export class WhatsAppWebService implements OnModuleInit {
           phone,
           message,
           sessionId,
+          conversationHistory,
         }),
       });
 

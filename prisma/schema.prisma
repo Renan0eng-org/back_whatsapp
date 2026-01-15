@@ -240,6 +240,16 @@ model Transaction {
   @@index([externalId])
 }
 
+enum InterestType {
+  SIMPLE    // Juros Simples
+  COMPOUND  // Juros Compostos
+}
+
+enum PeriodRule {
+  MENSAL  // Taxa ao mês
+  ANUAL   // Taxa ao ano
+}
+
 model Loan {
   idLoan              String   @id @default(cuid())
   userId              String
@@ -254,13 +264,42 @@ model Loan {
   isPaid              Boolean  @default(false)
   paidDate            DateTime?
   notes               String?
-  payments            LoanPayment[] // Histórico de pagamentos parciais
+  interestRate        Float?   // Taxa de juros em % (ex: 2.5 para 2.5%)
+  interestType        InterestType? @default(SIMPLE) // Tipo de juros: SIMPLE ou COMPOUND
+  periodRule          PeriodRule? @default(MENSAL) // Período da taxa: MENSAL ou ANUAL
+  marketReference     Float?   // Taxa de referência de mercado para comparação
+  expectedProfit      Float?   // Lucro previsto (juros esperados)
+  isRecurringInterest Boolean  @default(false) // Se os juros são pagos mensalmente
+  recurringInterestDay Int?    // Dia do mês para cobrança dos juros recorrentes (1-31)
+  payments            LoanPayment[] // Histórico de pagamentos parciais do principal
+  recurringPayments   RecurringInterestPayment[] // Histórico de pagamentos de juros mensais
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   @@index([userId])
   @@index([categoryId])
   @@index([dueDate])
+  @@index([isPaid])
+  @@index([isRecurringInterest])
+}
+
+// Modelo para registrar pagamentos mensais de juros recorrentes
+model RecurringInterestPayment {
+  idPayment           String   @id @default(cuid())
+  loanId              String
+  loan                Loan     @relation(fields: [loanId], references: [idLoan], onDelete: Cascade)
+  referenceMonth      DateTime // Mês de referência do pagamento (primeiro dia do mês)
+  amount              Float    // Valor do juros pago
+  isPaid              Boolean  @default(false)
+  paidDate            DateTime?
+  transactionId       String?  // ID da transação de entrada (se vinculado)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([loanId, referenceMonth]) // Um pagamento por mês por empréstimo
+  @@index([loanId])
+  @@index([referenceMonth])
   @@index([isPaid])
 }
 

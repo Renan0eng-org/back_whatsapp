@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma.service';
-import { CreateLoanBatchDto, CreateLoanDto, CreateLoanFromTransactionDto, UpdateLoanDto } from './dto';
+import { CreateLoanBatchDto, CreateLoanDto, CreateLoanFromTransactionDto, PayRecurringInterestDto, UpdateLoanDto } from './dto';
+import { calculateExpectedProfit, calculateMonthsDuration, calculateTotalInterestEarned } from './utils/interest-calculator';
 
 @Injectable()
 export class EmprrestimosService {
@@ -24,6 +25,7 @@ export class EmprrestimosService {
       data: {
         ...dto,
         userId,
+        createdAt: dto.createdAt || new Date(),
       },
       include: {
         category: true,
@@ -106,8 +108,23 @@ export class EmprrestimosService {
     }
 
     const created = await this.prisma.$transaction(
-      dto.items.map((item) =>
-        this.prisma.loan.create({
+      dto.items.map((item) => {
+        // Calcular lucro previsto se houver taxa de juros
+        let expectedProfit: number | undefined;
+        if (item.interestRate && item.interestRate > 0) {
+          const createdDate = item.createdAt || new Date();
+          const dueDate = new Date(item.dueDate);
+          const months = calculateMonthsDuration(createdDate, dueDate);
+          expectedProfit = calculateExpectedProfit(
+            item.amount,
+            item.interestRate,
+            item.interestType || 'SIMPLE',
+            item.periodRule || 'MENSAL',
+            months,
+          );
+        }
+
+        return this.prisma.loan.create({
           data: {
             userId,
             borrowerName: dto.borrowerName,
@@ -117,10 +134,18 @@ export class EmprrestimosService {
             dueDate: item.dueDate,
             description: item.description,
             notes: item.notes,
+            interestRate: item.interestRate,
+            interestType: item.interestType,
+            periodRule: item.periodRule,
+            marketReference: item.marketReference,
+            expectedProfit: expectedProfit,
+            isRecurringInterest: item.isRecurringInterest || false,
+            recurringInterestDay: item.recurringInterestDay,
+            createdAt: item.createdAt || new Date(),
           },
           include: { category: true },
-        })
-      )
+        });
+      })
     );
 
     return created;
@@ -143,6 +168,9 @@ export class EmprrestimosService {
           },
           orderBy: { createdAt: 'asc' },
         },
+        recurringPayments: {
+          orderBy: { referenceMonth: 'asc' },
+        },
       },
       orderBy: { dueDate: 'asc' },
     });
@@ -151,11 +179,23 @@ export class EmprrestimosService {
     return loans.map((loan) => {
       const totalPaid = loan.payments.reduce((sum, payment) => sum + payment.amount, 0);
       const remainingBalance = loan.amount - totalPaid;
+      
+      // Calcular juros recorrentes pagos
+      const recurringInterestPaid = loan.recurringPayments
+        .filter(rp => rp.isPaid)
+        .reduce((sum, rp) => sum + rp.amount, 0);
+      
+      // Calcular juros recorrentes pendentes
+      const recurringInterestPending = loan.recurringPayments
+        .filter(rp => !rp.isPaid)
+        .reduce((sum, rp) => sum + rp.amount, 0);
 
       return {
         ...loan,
         totalPaid,
         remainingBalance,
+        recurringInterestPaid,
+        recurringInterestPending,
       };
     });
   }
@@ -335,6 +375,9 @@ export class EmprrestimosService {
       byCategory[categoryName] = (byCategory[categoryName] || 0) + remaining;
     }
 
+    // Calcular rendimentos de juros
+    const interestEarnings = calculateTotalInterestEarned(loans);
+
     return {
       totalLoaned,
       totalPaid,
@@ -348,6 +391,254 @@ export class EmprrestimosService {
       unlinkedAmount,
       unlinkedCount,
       byCategory,
+      interestEarnings,
     };
+  }
+
+  async getInterestEarnings(userId: string) {
+    const loans = await this.prisma.loan.findMany({
+      where: { userId },
+      include: { 
+        payments: true,
+        recurringPayments: true,
+      },
+    });
+
+    const basicEarnings = calculateTotalInterestEarned(loans);
+    
+    // Calcular juros recorrentes
+    const recurringInterestPaid = loans.reduce((total, loan) => {
+      const paidRecurring = loan.recurringPayments
+        .filter(rp => rp.isPaid)
+        .reduce((sum, rp) => sum + rp.amount, 0);
+      return total + paidRecurring;
+    }, 0);
+
+    const recurringInterestPending = loans.reduce((total, loan) => {
+      const pendingRecurring = loan.recurringPayments
+        .filter(rp => !rp.isPaid)
+        .reduce((sum, rp) => sum + rp.amount, 0);
+      return total + pendingRecurring;
+    }, 0);
+
+    return {
+      ...basicEarnings,
+      recurringInterestPaid,
+      recurringInterestPending,
+      totalRecurringInterest: recurringInterestPaid + recurringInterestPending,
+    };
+  }
+
+  // Calcular o valor do juros mensal para um empréstimo com juros recorrentes
+  calculateMonthlyInterest(loan: { amount: number; interestRate: number; periodRule?: string }): number {
+    const rate = loan.interestRate;
+    const monthlyRate = loan.periodRule === 'ANUAL' ? rate / 12 : rate;
+    return loan.amount * (monthlyRate / 100);
+  }
+
+  // Gerar parcelas de juros recorrentes para um empréstimo
+  async generateRecurringInterestPayments(loanId: string, userId: string, monthsAhead: number = 1) {
+    const loan = await this.getLoanById(loanId, userId);
+    
+    if (!loan.isRecurringInterest || !loan.interestRate) {
+      throw new BadRequestException('Este empréstimo não possui juros recorrentes configurados');
+    }
+
+    const monthlyInterest = this.calculateMonthlyInterest({
+      amount: loan.amount,
+      interestRate: loan.interestRate,
+      periodRule: loan.periodRule || 'MENSAL',
+    });
+
+    const now = new Date();
+    const createdPayments:any = [];
+
+    for (let i = 0; i <= monthsAhead; i++) {
+      const referenceMonth = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      
+      // Verificar se já existe pagamento para este mês
+      const existing = await this.prisma.recurringInterestPayment.findUnique({
+        where: {
+          loanId_referenceMonth: {
+            loanId,
+            referenceMonth,
+          },
+        },
+      });
+
+      if (!existing) {
+        const payment = await this.prisma.recurringInterestPayment.create({
+          data: {
+            loanId,
+            referenceMonth,
+            amount: Math.round(monthlyInterest * 100) / 100,
+            isPaid: false,
+          },
+        });
+        createdPayments.push(payment);
+      }
+    }
+
+    return createdPayments;
+  }
+
+  // Registrar pagamento de juros recorrentes
+  async payRecurringInterest(userId: string, dto: PayRecurringInterestDto) {
+    const loan = await this.getLoanById(dto.loanId, userId);
+
+    // Verificar se a parcela existe
+    const referenceMonth = new Date(dto.referenceMonth);
+    referenceMonth.setDate(1);
+    referenceMonth.setHours(0, 0, 0, 0);
+
+    let payment = await this.prisma.recurringInterestPayment.findUnique({
+      where: {
+        loanId_referenceMonth: {
+          loanId: dto.loanId,
+          referenceMonth,
+        },
+      },
+    });
+
+    // Se não existir, criar
+    if (!payment) {
+      const monthlyInterest = this.calculateMonthlyInterest({
+        amount: loan.amount,
+        interestRate: loan.interestRate || 0,
+        periodRule: loan.periodRule || 'MENSAL',
+      });
+
+      payment = await this.prisma.recurringInterestPayment.create({
+        data: {
+          loanId: dto.loanId,
+          referenceMonth,
+          amount: dto.amount || Math.round(monthlyInterest * 100) / 100,
+          isPaid: true,
+          paidDate: new Date(),
+          transactionId: dto.transactionId,
+          notes: dto.notes,
+        },
+      });
+    } else {
+      // Atualizar pagamento existente
+      payment = await this.prisma.recurringInterestPayment.update({
+        where: { idPayment: payment.idPayment },
+        data: {
+          amount: dto.amount || payment.amount,
+          isPaid: true,
+          paidDate: new Date(),
+          transactionId: dto.transactionId,
+          notes: dto.notes,
+        },
+      });
+    }
+
+    return payment;
+  }
+
+  // Reverter pagamento de juros recorrentes
+  async reverseRecurringInterestPayment(paymentId: string, userId: string) {
+    const payment = await this.prisma.recurringInterestPayment.findUnique({
+      where: { idPayment: paymentId },
+      include: { loan: true },
+    });
+
+    if (!payment || payment.loan.userId !== userId) {
+      throw new NotFoundException('Pagamento não encontrado');
+    }
+
+    return this.prisma.recurringInterestPayment.update({
+      where: { idPayment: paymentId },
+      data: {
+        isPaid: false,
+        paidDate: null,
+        transactionId: null,
+      },
+    });
+  }
+
+  // Obter parcelas de juros recorrentes pendentes
+  async getPendingRecurringInterest(userId: string) {
+    const loans = await this.prisma.loan.findMany({
+      where: {
+        userId,
+        isRecurringInterest: true,
+        isPaid: false,
+      },
+      include: {
+        recurringPayments: {
+          where: { isPaid: false },
+          orderBy: { referenceMonth: 'asc' },
+        },
+      },
+    });
+
+    // Gerar parcelas pendentes para o mês atual se não existirem
+    for (const loan of loans) {
+      await this.generateRecurringInterestPayments(loan.idLoan, userId, 0);
+    }
+
+    // Re-buscar com parcelas atualizadas
+    return this.prisma.loan.findMany({
+      where: {
+        userId,
+        isRecurringInterest: true,
+        isPaid: false,
+      },
+      include: {
+        category: true,
+        recurringPayments: {
+          where: { isPaid: false },
+          orderBy: { referenceMonth: 'asc' },
+        },
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+  }
+
+  // Resumo de juros recorrentes por mês (para gráfico)
+  async getRecurringInterestSummary(userId: string, monthsBack: number = 12) {
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 1);
+
+    const payments = await this.prisma.recurringInterestPayment.findMany({
+      where: {
+        loan: { userId },
+        referenceMonth: { gte: startDate },
+      },
+      include: {
+        loan: {
+          select: { borrowerName: true, idLoan: true },
+        },
+      },
+      orderBy: { referenceMonth: 'asc' },
+    });
+
+    // Agrupar por mês
+    const byMonth: Record<string, { paid: number; pending: number; details: any[] }> = {};
+
+    for (const payment of payments) {
+      const monthKey = `${payment.referenceMonth.getFullYear()}-${String(payment.referenceMonth.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!byMonth[monthKey]) {
+        byMonth[monthKey] = { paid: 0, pending: 0, details: [] };
+      }
+
+      if (payment.isPaid) {
+        byMonth[monthKey].paid += payment.amount;
+      } else {
+        byMonth[monthKey].pending += payment.amount;
+      }
+
+      byMonth[monthKey].details.push({
+        loanId: payment.loan.idLoan,
+        borrowerName: payment.loan.borrowerName,
+        amount: payment.amount,
+        isPaid: payment.isPaid,
+        paidDate: payment.paidDate,
+      });
+    }
+
+    return byMonth;
   }
 }
