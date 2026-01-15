@@ -421,11 +421,48 @@ export class EmprrestimosService {
       return total + pendingRecurring;
     }, 0);
 
+    // Calcular juros recorrentes do mês atual
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const currentMonthRecurringInterest = loans.reduce((total, loan) => {
+      const monthPayments = loan.recurringPayments
+        .filter(rp => rp.referenceMonth >= currentMonthStart && rp.referenceMonth <= currentMonthEnd)
+        .reduce((sum, rp) => sum + rp.amount, 0);
+      return total + monthPayments;
+    }, 0);
+
+    // Calcular rendimento de juros do mês sem recorrência (juros simples + compostos do mês)
+    const nonRecurringMonthInterest = loans.reduce((total, loan) => {
+      // Apenas juros não recorrentes
+      if (!loan.isRecurringInterest && loan.interestRate && loan.interestRate > 0) {
+        // Calcular juros apenas para este mês
+        const loanStartDate = new Date(loan.createdAt);
+        const loanEndDate = loan.isPaid && loan.paidDate ? new Date(loan.paidDate) : new Date(loan.dueDate);
+        
+        // Verificar se o empréstimo foi ativo durante este mês
+        if (loanEndDate >= currentMonthStart && loanStartDate <= currentMonthEnd) {
+          const startForCalc = loanStartDate > currentMonthStart ? loanStartDate : currentMonthStart;
+          const endForCalc = loanEndDate < currentMonthEnd ? loanEndDate : currentMonthEnd;
+          
+          const daysDiff = Math.ceil((endForCalc.getTime() - startForCalc.getTime()) / (1000 * 60 * 60 * 24));
+          const dailyRate = loan.interestRate / 365 / 100;
+          const monthInterest = loan.amount * dailyRate * daysDiff;
+          
+          return total + monthInterest;
+        }
+      }
+      return total;
+    }, 0);
+
     return {
       ...basicEarnings,
       recurringInterestPaid,
       recurringInterestPending,
       totalRecurringInterest: recurringInterestPaid + recurringInterestPending,
+      currentMonthRecurringInterest: Math.round(currentMonthRecurringInterest * 100) / 100,
+      currentMonthNonRecurringInterest: Math.round(nonRecurringMonthInterest * 100) / 100,
     };
   }
 
@@ -640,5 +677,50 @@ export class EmprrestimosService {
     }
 
     return byMonth;
+  }
+
+  // Editar parcela de juros recorrentes
+  async updateRecurringInterestPayment(
+    paymentId: string, 
+    userId: string, 
+    data: { amount?: number; referenceMonth?: Date; notes?: string }
+  ) {
+    const payment = await this.prisma.recurringInterestPayment.findUnique({
+      where: { idPayment: paymentId },
+      include: { loan: true },
+    });
+
+    if (!payment || payment.loan.userId !== userId) {
+      throw new NotFoundException('Pagamento não encontrado');
+    }
+
+    return this.prisma.recurringInterestPayment.update({
+      where: { idPayment: paymentId },
+      data: {
+        amount: data.amount !== undefined ? data.amount : payment.amount,
+        referenceMonth: data.referenceMonth !== undefined ? data.referenceMonth : payment.referenceMonth,
+        notes: data.notes !== undefined ? data.notes : payment.notes,
+      },
+    });
+  }
+
+  // Deletar parcela de juros recorrentes
+  async deleteRecurringInterestPayment(paymentId: string, userId: string) {
+    const payment = await this.prisma.recurringInterestPayment.findUnique({
+      where: { idPayment: paymentId },
+      include: { loan: true },
+    });
+
+    if (!payment || payment.loan.userId !== userId) {
+      throw new NotFoundException('Pagamento não encontrado');
+    }
+
+    if (payment.isPaid) {
+      throw new BadRequestException('Não é possível excluir uma parcela já paga. Estorne primeiro.');
+    }
+
+    return this.prisma.recurringInterestPayment.delete({
+      where: { idPayment: paymentId },
+    });
   }
 }

@@ -57,8 +57,8 @@ export class EmprrestimosController {
   async getInterestEarnings(@GetUser() user: any) {
     return this.emprrestimosService.getInterestEarnings(user.idUser);
   }
-
   @Get('summary')
+
   async getLoansSummary(@GetUser() user: any) {
     return this.emprrestimosService.getLoansSummary(user.idUser);
   }
@@ -132,5 +132,22 @@ export class EmprrestimosController {
     @Param('paymentId') paymentId: string,
   ) {
     return this.emprrestimosService.reverseRecurringInterestPayment(paymentId, user.idUser);
+  }
+
+  @Put('recurring-interest/:paymentId')
+  async updateRecurringInterestPayment(
+    @GetUser() user: any,
+    @Param('paymentId') paymentId: string,
+    @Body() data: { amount?: number; referenceMonth?: Date; notes?: string },
+  ) {
+    return this.emprrestimosService.updateRecurringInterestPayment(paymentId, user.idUser, data);
+  }
+
+  @Delete('recurring-interest/:paymentId')
+  async deleteRecurringInterestPayment(
+    @GetUser() user: any,
+    @Param('paymentId') paymentId: string,
+  ) {
+    return this.emprrestimosService.deleteRecurringInterestPayment(paymentId, user.idUser);
   }
 }
