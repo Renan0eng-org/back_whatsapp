@@ -232,6 +232,7 @@ model Transaction {
   loanPayments    LoanPayment[] // Pagamentos de empréstimos associados a essa transação
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  deletedAt           DateTime?
 
   @@index([userId])
   @@index([date])
@@ -275,6 +276,7 @@ model Loan {
   recurringPayments   RecurringInterestPayment[] // Histórico de pagamentos de juros mensais
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+  deletedAt           DateTime?
 
   @@index([userId])
   @@index([categoryId])

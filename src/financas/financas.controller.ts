@@ -122,6 +122,23 @@ export class FinancasController {
     return this.financasService.deleteTransaction(id, user.idUser);
   }
 
+  // ===== TRASH (LIXEIRA) =====
+
+  @Get('trash')
+  async getDeletedTransactions(@GetUser() user: any) {
+    return this.financasService.getDeletedTransactions(user.idUser);
+  }
+
+  @Put('trash/:id/restore')
+  async restoreTransaction(@GetUser() user: any, @Param('id') id: string) {
+    return this.financasService.restoreTransaction(id, user.idUser);
+  }
+
+  @Delete('trash/:id')
+  async permanentDeleteTransaction(@GetUser() user: any, @Param('id') id: string) {
+    return this.financasService.permanentDeleteTransaction(id, user.idUser);
+  }
+
   // ===== IMPORT CSV =====
 
   @Post('import-csv')

@@ -2,9 +2,9 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { ExpenseCategoryEnum } from 'generated/prisma';
 import { PrismaService } from 'src/database/prisma.service';
 import {
-    ClassifyTransactionDto,
-    CreateExpenseCategoryDto,
-    CreateTransactionDto,
+  ClassifyTransactionDto,
+  CreateExpenseCategoryDto,
+  CreateTransactionDto,
 } from './dto';
 
 @Injectable()
@@ -98,7 +98,7 @@ export class FinancasService {
         type?: string; // income | expense | all
     },
   ) {
-    const where: any = { userId };
+    const where: any = { userId, deletedAt: null };
 
     if (filters?.startDate || filters?.endDate) {
       where.date = {};
@@ -302,6 +302,72 @@ export class FinancasService {
   async deleteTransaction(id: string, userId: string) {
     await this.getTransactionById(id, userId);
 
+    return this.prisma.transaction.update({
+      where: { idTransaction: id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
+  // ===== TRASH (LIXEIRA) =====
+
+  async getDeletedTransactions(userId: string) {
+    return this.prisma.transaction.findMany({
+      where: {
+        userId,
+        deletedAt: { not: null },
+      },
+      include: { category: true },
+      orderBy: { deletedAt: 'desc' },
+    });
+  }
+
+  async restoreTransaction(id: string, userId: string) {
+    const transaction = await this.prisma.transaction.findUnique({
+      where: { idTransaction: id },
+      include: { category: true },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException('Transação não encontrada');
+    }
+
+    if (transaction.userId !== userId) {
+      throw new BadRequestException('Acesso negado a esta transação');
+    }
+
+    if (!transaction.deletedAt) {
+      throw new BadRequestException('Transação não está na lixeira');
+    }
+
+    return this.prisma.transaction.update({
+      where: { idTransaction: id },
+      data: { deletedAt: null },
+      include: { category: true },
+    });
+  }
+
+  async permanentDeleteTransaction(id: string, userId: string) {
+    const transaction = await this.prisma.transaction.findUnique({
+      where: { idTransaction: id },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException('Transação não encontrada');
+    }
+
+    if (transaction.userId !== userId) {
+      throw new BadRequestException('Acesso negado a esta transação');
+    }
+
+    if (!transaction.deletedAt) {
+      throw new BadRequestException('Transação deve estar na lixeira para ser excluída permanentemente');
+    }
+
+    // Remover vínculos de pagamento com empréstimos
+    await this.prisma.loanPayment.deleteMany({
+      where: { transactionId: id },
+    });
+
     return this.prisma.transaction.delete({
       where: { idTransaction: id },
     });
@@ -436,7 +502,7 @@ export class FinancasService {
     startDate?: string,
     endDate?: string,
   ) {
-    const where: any = { userId };
+    const where: any = { userId, deletedAt: null };
 
     if (startDate && endDate) {
       where.date = {
@@ -491,6 +557,7 @@ export class FinancasService {
     const transactions = await this.prisma.transaction.findMany({
       where: {
         userId,
+        deletedAt: null,
         date: { gte: start, lte: end },
       },
       orderBy: { date: 'asc' },
@@ -519,6 +586,7 @@ export class FinancasService {
     const transactionsBefore = await this.prisma.transaction.findMany({
       where: {
         userId,
+        deletedAt: null,
         date: { lt: start },
       },
     });
