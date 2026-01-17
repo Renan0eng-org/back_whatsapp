@@ -9,7 +9,7 @@ import {
 
 @Injectable()
 export class FinancasService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   // ===== EXPENSE CATEGORIES =====
 
@@ -88,14 +88,14 @@ export class FinancasService {
   async getTransactions(
     userId: string,
     filters?: {
-        startDate?: string;
-        endDate?: string;
-        categoryId?: string;
-        isClassified?: boolean;
-        search?: string;
-        minValue?: number;
-        maxValue?: number;
-        type?: string; // income | expense | all
+      startDate?: string;
+      endDate?: string;
+      categoryId?: string;
+      isClassified?: boolean;
+      search?: string;
+      minValue?: number;
+      maxValue?: number;
+      type?: string; // income | expense | all
     },
   ) {
     const where: any = { userId, deletedAt: null };
@@ -143,28 +143,28 @@ export class FinancasService {
     });
   }
 
-    async unclassifyTransaction(transactionId: string, userId: string) {
-      // Ensure transaction belongs to user
-      await this.getTransactionById(transactionId, userId);
+  async unclassifyTransaction(transactionId: string, userId: string) {
+    // Ensure transaction belongs to user
+    await this.getTransactionById(transactionId, userId);
 
-      // Remove vínculos de pagamento com empréstimos
-      await this.prisma.loanPayment.deleteMany({
-        where: { transactionId: transactionId },
-      });
+    // Remove vínculos de pagamento com empréstimos
+    await this.prisma.loanPayment.deleteMany({
+      where: { transactionId: transactionId },
+    });
 
-      // Reset classificação e categoria
-      const updated = await this.prisma.transaction.update({
-        where: { idTransaction: transactionId },
-        data: {
-          categoryId: null,
-          isClassified: false,
-          notes: null,
-        },
-        include: { category: true },
-      });
+    // Reset classificação e categoria
+    const updated = await this.prisma.transaction.update({
+      where: { idTransaction: transactionId },
+      data: {
+        categoryId: null,
+        isClassified: false,
+        notes: null,
+      },
+      include: { category: true },
+    });
 
-      return updated;
-    }
+    return updated;
+  }
   async getTransactionById(id: string, userId: string) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { idTransaction: id },
@@ -206,26 +206,14 @@ export class FinancasService {
     if (dto.loanPayments && dto.loanPayments.length > 0) {
       // Validar que o total dos pagamentos não excede o valor da transação
       const totalPayments = dto.loanPayments.reduce((sum, p) => sum + p.amount, 0);
-      if (totalPayments > transaction.value) {
+      // Valida o lavor negativo 
+      const negativeTransaction = transaction.value * -1;
+      if (totalPayments > transaction.value && totalPayments > negativeTransaction) {
         throw new BadRequestException(
           `Total de pagamentos (${totalPayments}) não pode exceder o valor da transação (${transaction.value})`
         );
       }
 
-      for (const payment of dto.loanPayments) {
-        const loan = await this.prisma.loan.findUnique({
-          where: { idLoan: payment.loanId },
-        });
-        if (!loan || loan.userId !== userId) {
-          throw new NotFoundException(`Empréstimo ${payment.loanId} não encontrado`);
-        }
-        if (!loan.isPaid) {
-          throw new BadRequestException('Apenas empréstimos pagos podem receber pagamentos');
-        }
-        if (payment.amount <= 0) {
-          throw new BadRequestException(`Valor de pagamento deve ser maior que zero`);
-        }
-      }
     }
 
     const updatedTransaction = await this.prisma.transaction.update({
@@ -241,18 +229,28 @@ export class FinancasService {
     // Create loan payments records if provided
     if (dto.loanPayments && dto.loanPayments.length > 0) {
       await this.prisma.$transaction(
-        dto.loanPayments.map((payment) =>
-          this.prisma.loanPayment.create({
+        dto.loanPayments.map((payment) => {
+          if (payment.loanId) {
+            return this.prisma.loan.update({
+              where: { idLoan: payment.loanId },
+              data: {
+                transactionId: transactionId,
+              },
+            });
+          }
+
+          return this.prisma.loanPayment.create({
             data: {
               loanId: payment.loanId,
               transactionId: transactionId,
               amount: payment.amount,
               notes: payment.notes,
             },
-          })
-        )
+          });
+        })
       );
     }
+
 
     // Se marcado para criar empréstimo, criar automaticamente
     if (dto.createLoan) {
@@ -266,11 +264,18 @@ export class FinancasService {
                   userId,
                   borrowerName: dto.borrowerName || transaction.description,
                   amount: item.amount,
-                  categoryId: dto.categoryId,
+                  categoryId: item.categoryId,
                   transactionId: transactionId,
                   dueDate: item.dueDate,
                   description: item.description ?? `Parcela de empréstimo relacionada à transação: ${transaction.description}`,
                   notes: item.notes ?? transaction.notes,
+                  interestRate: item.interestRate,
+                  interestType: item.interestType,
+                  periodRule: item.periodRule,
+                  expectedProfit: item.expectedProfit,
+                  isRecurringInterest: item.isRecurringInterest ?? false,
+                  recurringInterestDay: item.recurringInterestDay,
+                  createdAt: item.createdAt ?? new Date(),
                 },
               })
             )

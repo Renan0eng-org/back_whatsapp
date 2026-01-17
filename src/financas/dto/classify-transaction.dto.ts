@@ -34,6 +34,9 @@ export class LoanItemDto {
   @IsNumber()
   amount: number;
 
+  @IsString()
+  categoryId: string;
+
   @IsDate()
   @Type(() => Date)
   dueDate: Date;
@@ -45,6 +48,35 @@ export class LoanItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsNumber()
+  interestRate?: number;
+
+  @IsOptional()
+  @IsString()
+  interestType?: 'SIMPLE' | 'COMPOUND';
+
+  @IsOptional()
+  @IsString()
+  periodRule?: 'MENSAL' | 'ANUAL';
+
+  @IsOptional()
+  @IsNumber()
+  expectedProfit?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isRecurringInterest?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  recurringInterestDay?: number;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  createdAt?: Date;
 }
 
 export class LoanPaymentDto {
