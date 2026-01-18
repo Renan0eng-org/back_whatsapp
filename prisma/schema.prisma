@@ -38,6 +38,7 @@ model User {
   transactions   Transaction[]
   expenseCategories ExpenseCategory[]
   loans          Loan[]
+  recurringExpenses RecurringExpense[]
 
   errorLogs      ErrorLog[]
 
@@ -208,6 +209,7 @@ model ExpenseCategory {
   user          User?    @relation(fields: [userId], references: [idUser], onDelete: Cascade)
   transactions  Transaction[]
   loans         Loan[]
+  recurringExpenses RecurringExpense[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -320,3 +322,32 @@ model LoanPayment {
   @@index([transactionId])
 }
 
+model RecurringExpense {
+  idRecurringExpense  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [idUser], onDelete: Cascade)
+  name                String   // Nome do gasto
+  description         String?  // Descrição
+  companyName         String?  // Nome da empresa
+  categoryId          String?
+  category            ExpenseCategory? @relation(fields: [categoryId], references: [idCategory], onDelete: SetNull)
+  qrCode              String?  // QR Code (PIX ou código de barras)
+  dueDate             DateTime // Data de vencimento
+  amount              Float    // Valor do gasto
+  registrationDate    DateTime @default(now()) // Data de cadastro
+  isActive            Boolean  @default(true) // Se o gasto está ativo
+  isPaid              Boolean  @default(false) // Se foi pago
+  paidDate            DateTime? // Data do pagamento
+  transactionId       String?  // ID da transação quando pago
+  recurringGroupId    String?  // ID do grupo de recorrência (para linkar gastos da mesma série)
+  isMainExpense       Boolean  @default(true) // Se é o gasto principal da série
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([dueDate])
+  @@index([isActive])
+  @@index([isPaid])
+  @@index([recurringGroupId])
+}

@@ -1,16 +1,16 @@
 import {
-  BadRequestException,
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Put,
-  Query,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors
+    BadRequestException,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Post,
+    Put,
+    Query,
+    UploadedFile,
+    UseGuards,
+    UseInterceptors
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Multer } from 'multer';
@@ -18,17 +18,24 @@ import { GetUser } from 'src/auth/get-user.decorator';
 import { Menu } from 'src/auth/menu.decorator';
 import { RefreshTokenGuard } from 'src/auth/refresh-token.guard';
 import {
-  ClassifyTransactionDto,
-  CreateExpenseCategoryDto,
-  CreateTransactionDto,
+    ClassifyTransactionDto,
+    CreateExpenseCategoryDto,
+    CreateRecurringExpenseDto,
+    CreateTransactionDto,
+    MarkExpenseAsPaidDto,
+    UpdateRecurringExpenseDto,
 } from './dto';
 import { FinancasService } from './financas.service';
+import { NotificationService } from './notification.service';
 
 @Controller('financas')
 @Menu('')
 @UseGuards(RefreshTokenGuard)
 export class FinancasController {
-  constructor(private financasService: FinancasService) {}
+  constructor(
+    private financasService: FinancasService,
+    private notificationService: NotificationService,
+  ) {}
 
   // ===== CATEGORIES =====
 
@@ -190,5 +197,99 @@ export class FinancasController {
       startDate,
       endDate,
     );
+  }
+
+  // ===== RECURRING EXPENSES =====
+
+  @Post('recurring-expenses')
+  async createRecurringExpense(
+    @GetUser() user: any,
+    @Body() dto: CreateRecurringExpenseDto,
+  ) {
+    return this.financasService.createRecurringExpense(user.idUser, dto);
+  }
+
+  @Get('recurring-expenses')
+  async getRecurringExpenses(
+    @GetUser() user: any,
+    @Query('isActive') isActive?: string,
+    @Query('isPaid') isPaid?: string,
+  ) {
+    const filters = {
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      isPaid: isPaid === 'true' ? true : isPaid === 'false' ? false : undefined,
+    };
+    return this.financasService.getRecurringExpenses(user.idUser, filters);
+  }
+
+  @Get('recurring-expenses/upcoming')
+  async getUpcomingExpenses(
+    @GetUser() user: any,
+    @Query('days') days?: string,
+  ) {
+    return this.financasService.getUpcomingExpenses(
+      user.idUser,
+      days ? parseInt(days) : 7,
+    );
+  }
+
+  @Get('recurring-expenses/overdue')
+  async getOverdueExpenses(@GetUser() user: any) {
+    return this.financasService.getOverdueExpenses(user.idUser);
+  }
+
+  @Get('recurring-expenses/:id')
+  async getRecurringExpenseById(
+    @GetUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.financasService.getRecurringExpenseById(id, user.idUser);
+  }
+
+  @Put('recurring-expenses/:id')
+  async updateRecurringExpense(
+    @GetUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateRecurringExpenseDto,
+  ) {
+    return this.financasService.updateRecurringExpense(id, user.idUser, dto);
+  }
+
+  @Delete('recurring-expenses/:id')
+  async deleteRecurringExpense(
+    @GetUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.financasService.deleteRecurringExpense(id, user.idUser);
+  }
+
+  @Delete('recurring-expenses/:id/group')
+  async deleteRecurringExpenseGroup(
+    @GetUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.financasService.deleteRecurringExpenseGroup(id, user.idUser);
+  }
+
+  @Get('recurring-expenses/:id/group')
+  async getRecurringExpenseGroup(
+    @GetUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.financasService.getRecurringExpenseGroup(id, user.idUser);
+  }
+
+  @Put('recurring-expenses/:id/mark-paid')
+  async markExpenseAsPaid(
+    @GetUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: MarkExpenseAsPaidDto,
+  ) {
+    return this.financasService.markExpenseAsPaid(id, user.idUser, dto);
+  }
+
+  @Post('recurring-expenses/test-notification')
+  async testNotification(@GetUser() user: any) {
+    return this.notificationService.sendTestNotification();
   }
 }

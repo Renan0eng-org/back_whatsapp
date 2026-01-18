@@ -2,9 +2,12 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { ExpenseCategoryEnum } from 'generated/prisma';
 import { PrismaService } from 'src/database/prisma.service';
 import {
-  ClassifyTransactionDto,
-  CreateExpenseCategoryDto,
-  CreateTransactionDto,
+    ClassifyTransactionDto,
+    CreateExpenseCategoryDto,
+    CreateRecurringExpenseDto,
+    CreateTransactionDto,
+    MarkExpenseAsPaidDto,
+    UpdateRecurringExpenseDto,
 } from './dto';
 
 @Injectable()
@@ -740,5 +743,376 @@ export class FinancasService {
     }
 
     return defaultCategories.length;
+  }
+
+  // ===== RECURRING EXPENSES (GASTOS PREVISTOS) =====
+
+  async createRecurringExpense(userId: string, dto: CreateRecurringExpenseDto) {
+    // Se for recorrente, criar múltiplos gastos
+    if (dto.isRecurring) {
+      const expenses: any[] = [];
+      const startDate = new Date(dto.dueDate);
+      const endDate = dto.recurringEndDate ? new Date(dto.recurringEndDate) : null;
+      const registrationDate = dto.registrationDate || new Date();
+
+      // Gerar ID único para o grupo de recorrência
+      const recurringGroupId = `recurring_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Limitar a 24 meses (2 anos) se não tiver data final
+      const maxMonths = endDate ? 
+        Math.min(this.getMonthsDifference(startDate, endDate) + 1, 120) : 12;
+
+      for (let i = 0; i < maxMonths; i++) {
+        const dueDate = new Date(startDate);
+        dueDate.setMonth(dueDate.getMonth() + i);
+
+        // Se tiver data final e ultrapassou, parar
+        if (endDate && dueDate > endDate) {
+          break;
+        }
+
+        const expense = await this.prisma.recurringExpense.create({
+          data: {
+            userId,
+            name: dto.name,
+            description: dto.description,
+            companyName: dto.companyName,
+            categoryId: dto.categoryId,
+            qrCode: dto.qrCode,
+            dueDate,
+            amount: dto.amount,
+            registrationDate,
+            recurringGroupId, // Linkar todos do mesmo grupo
+            isMainExpense: i === 0, // Primeiro é o principal
+          },
+          include: {
+            category: true,
+          },
+        });
+
+        expenses.push(expense);
+      }
+
+      return expenses[0]; // Retorna o primeiro gasto criado
+    }
+
+    // Criar gasto único
+    return this.prisma.recurringExpense.create({
+      data: {
+        userId,
+        name: dto.name,
+        description: dto.description,
+        companyName: dto.companyName,
+        categoryId: dto.categoryId,
+        qrCode: dto.qrCode,
+        dueDate: dto.dueDate,
+        amount: dto.amount,
+        registrationDate: dto.registrationDate || new Date(),
+      },
+      include: {
+        category: true,
+      },
+    });
+  }
+
+  private getMonthsDifference(startDate: Date, endDate: Date): number {
+    const months = (endDate.getFullYear() - startDate.getFullYear()) * 12;
+    return months + endDate.getMonth() - startDate.getMonth();
+  }
+
+  async getRecurringExpenses(userId: string, filters?: { isActive?: boolean; isPaid?: boolean }) {
+    const where: any = { userId };
+
+    if (filters?.isActive !== undefined) {
+      where.isActive = filters.isActive;
+    }
+
+    if (filters?.isPaid !== undefined) {
+      where.isPaid = filters.isPaid;
+    }
+
+    return this.prisma.recurringExpense.findMany({
+      where,
+      include: {
+        category: true,
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+  }
+
+  async getRecurringExpenseById(id: string, userId: string) {
+    const expense = await this.prisma.recurringExpense.findUnique({
+      where: { idRecurringExpense: id },
+      include: {
+        category: true,
+      },
+    });
+
+    if (!expense) {
+      throw new NotFoundException('Gasto previsto não encontrado');
+    }
+
+    if (expense.userId !== userId) {
+      throw new BadRequestException('Acesso negado a este gasto');
+    }
+
+    return expense;
+  }
+
+  async updateRecurringExpense(id: string, userId: string, dto: UpdateRecurringExpenseDto) {
+    const existingExpense = await this.getRecurringExpenseById(id, userId);
+
+    // Se o gasto faz parte de um grupo recorrente existente
+    if (existingExpense.recurringGroupId) {
+      // Se está removendo a recorrência (não está marcado como recorrente)
+      if (!dto.isRecurring) {
+        // Deletar todos os outros do grupo, mantendo apenas o atual
+        await this.prisma.recurringExpense.deleteMany({
+          where: {
+            recurringGroupId: existingExpense.recurringGroupId,
+            userId,
+            idRecurringExpense: { not: id }, // Não deletar o atual
+          },
+        });
+
+        // Atualizar o atual removendo do grupo
+        return this.prisma.recurringExpense.update({
+          where: { idRecurringExpense: id },
+          data: {
+            name: dto.name,
+            description: dto.description,
+            companyName: dto.companyName,
+            categoryId: dto.categoryId,
+            qrCode: dto.qrCode,
+            dueDate: dto.dueDate,
+            amount: dto.amount,
+            isActive: dto.isActive,
+            recurringGroupId: null, // Remover do grupo
+            isMainExpense: true, // Manter como principal
+          },
+          include: {
+            category: true,
+          },
+        });
+      }
+
+      // Se ainda é recorrente, atualizar todos do grupo (exceto datas de vencimento)
+      if (dto.isRecurring) {
+        // Atualizar todos os gastos do mesmo grupo com os mesmos dados (exceto dueDate)
+        await this.prisma.recurringExpense.updateMany({
+          where: {
+            recurringGroupId: existingExpense.recurringGroupId,
+            userId,
+            idRecurringExpense: { not: id }, // Não atualizar o atual ainda
+          },
+          data: {
+            name: dto.name !== undefined ? dto.name : undefined,
+            description: dto.description !== undefined ? dto.description : undefined,
+            companyName: dto.companyName !== undefined ? dto.companyName : undefined,
+            categoryId: dto.categoryId !== undefined ? dto.categoryId : undefined,
+            qrCode: dto.qrCode !== undefined ? dto.qrCode : undefined,
+            amount: dto.amount !== undefined ? dto.amount : undefined,
+            isActive: dto.isActive !== undefined ? dto.isActive : undefined,
+          },
+        });
+
+        // Atualizar o gasto atual
+        return this.prisma.recurringExpense.update({
+          where: { idRecurringExpense: id },
+          data: {
+            name: dto.name,
+            description: dto.description,
+            companyName: dto.companyName,
+            categoryId: dto.categoryId,
+            qrCode: dto.qrCode,
+            dueDate: dto.dueDate,
+            amount: dto.amount,
+            isActive: dto.isActive,
+          },
+          include: {
+            category: true,
+          },
+        });
+      }
+    }
+
+    // Se está marcando um gasto comum como recorrente pela primeira vez
+    if (dto.isRecurring && dto.dueDate && !existingExpense.recurringGroupId) {
+      const startDate = new Date(dto.dueDate);
+      const endDate = dto.recurringEndDate ? new Date(dto.recurringEndDate) : null;
+      const maxMonths = endDate ? 
+        Math.min(this.getMonthsDifference(startDate, endDate) + 1, 120) : 12;
+
+      // Gerar ID único para o grupo de recorrência
+      const recurringGroupId = `recurring_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Criar gastos recorrentes futuros baseados na data de vencimento atualizada
+      for (let i = 1; i < maxMonths; i++) {
+        const dueDate = new Date(startDate);
+        dueDate.setMonth(dueDate.getMonth() + i);
+
+        if (endDate && dueDate > endDate) {
+          break;
+        }
+
+        await this.prisma.recurringExpense.create({
+          data: {
+            userId,
+            name: dto.name || existingExpense.name,
+            description: dto.description !== undefined ? dto.description : existingExpense.description,
+            companyName: dto.companyName !== undefined ? dto.companyName : existingExpense.companyName,
+            categoryId: dto.categoryId !== undefined ? dto.categoryId : existingExpense.categoryId,
+            qrCode: dto.qrCode !== undefined ? dto.qrCode : existingExpense.qrCode,
+            dueDate,
+            amount: dto.amount !== undefined ? dto.amount : existingExpense.amount,
+            registrationDate: existingExpense.registrationDate,
+            recurringGroupId,
+            isMainExpense: false,
+          },
+        });
+      }
+
+      // Atualizar o gasto original para fazer parte do grupo
+      return this.prisma.recurringExpense.update({
+        where: { idRecurringExpense: id },
+        data: {
+          name: dto.name,
+          description: dto.description,
+          companyName: dto.companyName,
+          categoryId: dto.categoryId,
+          qrCode: dto.qrCode,
+          dueDate: dto.dueDate,
+          amount: dto.amount,
+          isActive: dto.isActive,
+          recurringGroupId,
+          isMainExpense: true,
+        },
+        include: {
+          category: true,
+        },
+      });
+    }
+
+    // Atualização normal (sem recorrência)
+    return this.prisma.recurringExpense.update({
+      where: { idRecurringExpense: id },
+      data: {
+        name: dto.name,
+        description: dto.description,
+        companyName: dto.companyName,
+        categoryId: dto.categoryId,
+        qrCode: dto.qrCode,
+        dueDate: dto.dueDate,
+        amount: dto.amount,
+        isActive: dto.isActive,
+      },
+      include: {
+        category: true,
+      },
+    });
+  }
+
+  async deleteRecurringExpense(id: string, userId: string) {
+    await this.getRecurringExpenseById(id, userId);
+
+    return this.prisma.recurringExpense.delete({
+      where: { idRecurringExpense: id },
+    });
+  }
+
+  async deleteRecurringExpenseGroup(id: string, userId: string) {
+    const expense = await this.getRecurringExpenseById(id, userId);
+    
+    if (!expense.recurringGroupId) {
+      // Se não tem grupo, deleta apenas o individual
+      return this.deleteRecurringExpense(id, userId);
+    }
+
+    // Deletar todos os gastos do mesmo grupo recorrente
+    const deletedCount = await this.prisma.recurringExpense.deleteMany({
+      where: {
+        recurringGroupId: expense.recurringGroupId,
+        userId,
+      },
+    });
+
+    return { deletedCount: deletedCount.count };
+  }
+
+  async getRecurringExpenseGroup(id: string, userId: string) {
+    const expense = await this.getRecurringExpenseById(id, userId);
+    
+    if (!expense.recurringGroupId) {
+      return [expense]; // Retorna apenas ele mesmo se não tem grupo
+    }
+
+    // Buscar todos os gastos do mesmo grupo
+    return this.prisma.recurringExpense.findMany({
+      where: {
+        recurringGroupId: expense.recurringGroupId,
+        userId,
+      },
+      include: {
+        category: true,
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+  }
+
+  async markExpenseAsPaid(id: string, userId: string, dto: MarkExpenseAsPaidDto) {
+    await this.getRecurringExpenseById(id, userId);
+
+    return this.prisma.recurringExpense.update({
+      where: { idRecurringExpense: id },
+      data: {
+        isPaid: true,
+        paidDate: dto.paidDate || new Date(),
+        transactionId: dto.transactionId,
+      },
+      include: {
+        category: true,
+      },
+    });
+  }
+
+  async getUpcomingExpenses(userId: string, days: number = 7) {
+    const now = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(now.getDate() + days);
+
+    return this.prisma.recurringExpense.findMany({
+      where: {
+        userId,
+        isActive: true,
+        isPaid: false,
+        dueDate: {
+          gte: now,
+          lte: futureDate,
+        },
+      },
+      include: {
+        category: true,
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+  }
+
+  async getOverdueExpenses(userId: string) {
+    const now = new Date();
+
+    return this.prisma.recurringExpense.findMany({
+      where: {
+        userId,
+        isActive: true,
+        isPaid: false,
+        dueDate: {
+          lt: now,
+        },
+      },
+      include: {
+        category: true,
+      },
+      orderBy: { dueDate: 'asc' },
+    });
   }
 }

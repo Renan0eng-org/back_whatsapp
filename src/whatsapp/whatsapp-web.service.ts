@@ -164,7 +164,31 @@ export class WhatsAppWebService implements OnModuleInit {
     const chatId = sanitizedPhone.includes('@') ? sanitizedPhone : `${sanitizedPhone}@c.us`
 
     try {
-      const result = await client.sendMessage(chatId, message)
+      // Verificar se o número é válido antes de enviar
+      this.logger.log(`Verificando número ${sanitizedPhone}...`)
+      const numberId = await client.getNumberId(sanitizedPhone)
+      
+      if (!numberId) {
+        throw new Error(`Número ${phoneNumber} não é um número válido do WhatsApp`)
+      }
+
+      this.logger.log(`Número verificado: ${numberId._serialized}`)
+      
+      // Buscar ou criar o chat antes de enviar a mensagem
+      this.logger.log(`Buscando/criando chat para ${numberId._serialized}...`)
+      let chat;
+      try {
+        chat = await client.getChatById(numberId._serialized)
+      } catch (chatError) {
+        this.logger.warn(`Chat não encontrado, tentando enviar sem buscar chat: ${chatError.message}`)
+        // Se o chat não existe, a biblioteca criará um novo ao enviar
+      }
+      
+      // Enviar mensagem (sem opções que possam causar erro)
+      this.logger.log(`Enviando mensagem...`)
+      const result = await client.sendMessage(numberId._serialized, message, {
+        sendSeen: false, // Não marcar como visto automaticamente
+      })
 
       const savedMessage = await this.prisma.whatsAppMessage.create({
         data: {
