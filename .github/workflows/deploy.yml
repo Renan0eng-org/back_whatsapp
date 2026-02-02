@@ -25,10 +25,9 @@ jobs:
         run: |
           docker rm -f back-whatsapp || true
           docker pull devnardi/back-whatsapp:latest
-          docker run -d \
-            --name back-whatsapp \
-            -p 4040:4000 \
+          docker run -d --name back-whatsapp -p 4040:4000 \
             -e DATABASE_URL="${{ secrets.DATABASE_URL_WHATS }}" \
             -e CORS="https://renannardi.com" \
             -e CHROME_PATH="/usr/bin/chromium-browser" \
             devnardi/back-whatsapp:latest
+
