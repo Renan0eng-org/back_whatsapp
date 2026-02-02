@@ -21,7 +21,7 @@ async function bootstrap() {
 
   // Suporta uma ou várias origens separadas por vírgula na variável CORS
   const corsEnv = process.env.CORS;
-  const defaultOrigin = 'http://10.1.1.15:3000';
+  const defaultOrigin = 'http://localhost:3000';
 
   const allowedOrigins = corsEnv
     ? corsEnv.split(',').map((s) => s.trim()).filter(Boolean)
