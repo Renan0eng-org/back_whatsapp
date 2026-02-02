@@ -30,4 +30,3 @@ jobs:
             -e CORS="https://renannardi.com" \
             -e CHROME_PATH="/usr/bin/chromium-browser" \
             devnardi/back-whatsapp:latest
-
