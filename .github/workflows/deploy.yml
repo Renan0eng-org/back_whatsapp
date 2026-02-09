@@ -1,4 +1,4 @@
-name: Deploy Backend WhatsApp
+name: Deploy Backend WhatsApp (PM2)
 
 on:
   push:
@@ -13,16 +13,22 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Login no Docker Hub
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USER }}" --password-stdin
+      - name: Instalar dependências
+        run: npm ci
 
-      - name: Build e push da imagem
-        run: |
-          docker build -t devnardi/back-whatsapp:latest .
-          docker push devnardi/back-whatsapp:latest
+      - name: Build
+        run: npm run build
 
-      - name: Subindo novo container com variáveis
+      - name: Deploy com PM2
         run: |
-          docker rm -f back-whatsapp || true
-          docker pull devnardi/back-whatsapp:latest
-          docker run -d --name back-whatsapp -p 4040:4000 -e DATABASE_URL="${{ secrets.DATABASE_URL_WHATS }}" -e CORS="https://renannardi.com" -e CHROME_PATH="/usr/bin/chromium-browser" devnardi/back-whatsapp:latest
+          pm2 stop back-whatsapp || true
+          pm2 delete back-whatsapp || true
+          pm2 start dist/index.js \
+            --name back-whatsapp \
+            --env-production \
+            --update-env
+          pm2 save
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_WHATS }}
+          CORS: https://renannardi.com
+          CHROME_PATH: /usr/bin/chromium-browser
