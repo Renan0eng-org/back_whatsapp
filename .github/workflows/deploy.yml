@@ -10,18 +10,35 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
+      - name: Atualizar código via git
+        run: |
+          cd /home/github/actions-runner/_work/back_whatsapp/back_whatsapp
+
+          if [ ! -d ".git" ]; then
+            git clone https://github.com/Renan0eng-org/back-whatsapp.git .
+          else
+            git pull origin main
+          fi
 
       - name: Instalar dependências
-        run: npm ci
+        run: |
+          cd /home/github/actions-runner/_work/back_whatsapp/back_whatsapp
+          npm install --force
+
+      - name: Gerar Prisma Client
+        run: |
+          cd /home/github/actions-runner/_work/back_whatsapp/back_whatsapp
+          npx prisma generate
 
       - name: Build
-        run: npm run build
+        run: |
+          cd /home/github/actions-runner/_work/back_whatsapp/back_whatsapp
+          npm run build
 
       - name: Deploy com PM2
         run: |
+          cd /home/github/actions-runner/_work/back_whatsapp/back_whatsapp
           pm2 stop back-whatsapp || true
           pm2 delete back-whatsapp || true
-          pm2 start dist/main.js --name back-whatsapp 
+          pm2 start dist/main.js --name back-whatsapp
           pm2 save
