@@ -90,14 +90,17 @@ export class AuthService {
     async loginWeb(userPayload: { idUser: string; email: string }) {
         const payload = { email: userPayload.email, sub: userPayload.idUser };
 
+        const accessSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'SECRET_KEY';
+        const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'SECRET_KEY';
+
         const [accessToken, refreshToken] = await Promise.all([
             this.jwtService.signAsync(payload, {
-                secret: process.env.JWT_ACCESS_SECRET,
+                secret: accessSecret,
                 expiresIn: '15m',
             }),
 
             this.jwtService.signAsync(payload, {
-                secret: process.env.JWT_REFRESH_SECRET,
+                secret: refreshSecret,
                 expiresIn: '7d',
             }),
         ]);
@@ -124,11 +127,11 @@ export class AuthService {
         };
 
         if (type === 'access' || type === 'any') {
-            pushSecret(process.env.JWT_ACCESS_SECRET);
+            pushSecret(process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET);
         }
 
         if (type === 'refresh' || type === 'any') {
-            pushSecret(process.env.JWT_REFRESH_SECRET);
+            pushSecret(process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
         }
 
         if (type !== 'refresh') {
@@ -167,7 +170,7 @@ export class AuthService {
     async refreshToken(token: string) {
         try {
             const dataToken = this.jwtService.verify(token, {
-                secret: process.env.JWT_REFRESH_SECRET,
+                secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'SECRET_KEY',
                 ignoreExpiration: false,
             });
 
@@ -178,13 +181,16 @@ export class AuthService {
 
             const payload = { email: user.email, sub: user.idUser };
 
+            const accessSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'SECRET_KEY';
+            const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'SECRET_KEY';
+
             const [accessToken, refreshToken] = await Promise.all([
                 this.jwtService.signAsync(payload, {
-                    secret: process.env.JWT_ACCESS_SECRET,
+                    secret: accessSecret,
                     expiresIn: '15m',
                 }),
                 this.jwtService.signAsync(payload, {
-                    secret: process.env.JWT_REFRESH_SECRET,
+                    secret: refreshSecret,
                     expiresIn: '7d',
                 }),
             ]);

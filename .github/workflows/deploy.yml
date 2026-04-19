@@ -40,5 +40,5 @@ jobs:
           cd /home/github/actions-runner/_work/back_whatsapp/back_whatsapp
           pm2 stop back-whatsapp || true
           pm2 delete back-whatsapp || true
-          pm2 start dist/main.js --name back-whatsapp
+          pm2 start npm --name back-whatsapp -- start
           pm2 save
