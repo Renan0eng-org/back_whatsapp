@@ -2,7 +2,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -39,6 +38,8 @@ model User {
   expenseCategories ExpenseCategory[]
   loans          Loan[]
   recurringExpenses RecurringExpense[]
+  importedFiles   ImportedCsvFile[]
+  importBatches   TransactionImportBatch[]
 
   errorLogs      ErrorLog[]
 
@@ -46,6 +47,16 @@ model User {
   @@index([user_id_create])
   @@index([user_id_update])
   @@index([user_id_delete])
+}
+
+enum ImportBatchStatus {
+  IMPORTED
+  REVERTED
+}
+
+enum ImportBatchType {
+  IMPORT
+  REIMPORT
 }
 
 model Nivel_Acesso {
@@ -232,6 +243,8 @@ model Transaction {
   notes           String?
   metadata        Json?    // Para armazenar dados adicionais do CSV
   loanPayments    LoanPayment[] // Pagamentos de empréstimos associados a essa transação
+  importBatchId   String?
+  importBatch     TransactionImportBatch? @relation(fields: [importBatchId], references: [idImportBatch], onDelete: SetNull)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt           DateTime?
@@ -241,6 +254,49 @@ model Transaction {
   @@index([categoryId])
   @@index([isClassified])
   @@index([externalId])
+  @@index([importBatchId])
+}
+
+model ImportedCsvFile {
+  idImportedFile String                 @id @default(cuid())
+  userId         String
+  user           User                   @relation(fields: [userId], references: [idUser], onDelete: Cascade)
+  originalName   String
+  storedName     String
+  storagePath    String
+  mimeType       String?
+  fileSize       Int
+  contentHash    String
+  importedAt     DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  batches        TransactionImportBatch[]
+
+  @@index([userId])
+  @@index([contentHash])
+}
+
+model TransactionImportBatch {
+  idImportBatch          String           @id @default(cuid())
+  userId                 String
+  user                   User             @relation(fields: [userId], references: [idUser], onDelete: Cascade)
+  importedFileId         String
+  importedFile           ImportedCsvFile  @relation(fields: [importedFileId], references: [idImportedFile], onDelete: Cascade)
+  batchType              ImportBatchType  @default(IMPORT)
+  status                 ImportBatchStatus @default(IMPORTED)
+  importedCount          Int              @default(0)
+  restoredFromTrashCount Int              @default(0)
+  skippedCount           Int              @default(0)
+  movedToTrashCount      Int              @default(0)
+  deletedCount           Int              @default(0)
+  revertedAt             DateTime?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  transactions           Transaction[]
+
+  @@index([userId])
+  @@index([importedFileId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 enum InterestType {

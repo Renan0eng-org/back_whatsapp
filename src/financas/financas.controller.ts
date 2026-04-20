@@ -8,12 +8,14 @@ import {
     Post,
     Put,
     Query,
+  Res,
     UploadedFile,
     UseGuards,
     UseInterceptors
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Multer } from 'multer';
+import { Response } from 'express';
 import { GetUser } from 'src/auth/get-user.decorator';
 import { Menu } from 'src/auth/menu.decorator';
 import { RefreshTokenGuard } from 'src/auth/refresh-token.guard';
@@ -163,7 +165,45 @@ export class FinancasController {
     }
 
     const content = file.buffer.toString('utf-8');
-    return this.financasService.importTransactionsFromCsv(user.idUser, content);
+    return this.financasService.importTransactionsFromCsv(user.idUser, {
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      fileContent: content,
+    });
+  }
+
+  @Get('import-csv/history')
+  async getImportHistory(@GetUser() user: any) {
+    return this.financasService.getImportHistory(user.idUser);
+  }
+
+  @Post('import-csv/:batchId/revert')
+  async revertImportBatch(
+    @GetUser() user: any,
+    @Param('batchId') batchId: string,
+  ) {
+    return this.financasService.revertImportBatch(user.idUser, batchId);
+  }
+
+  @Get('import-csv/:batchId/download')
+  async downloadImportedCsv(
+    @GetUser() user: any,
+    @Param('batchId') batchId: string,
+    @Res() response: Response,
+  ) {
+    const file = await this.financasService.getImportBatchFile(user.idUser, batchId);
+    return response.download(file.filePath, file.fileName);
+  }
+
+  @Get('import-csv/template')
+  async downloadCsvTemplate(@Res() response: Response) {
+    const csvTemplate =
+      'Data,Valor,Identificador,Descrição\n02/01/2026,320.00,695831c6-4ea5-4464-a13c-75e06e68c9d9,Transferência recebida pelo Pix\n03/01/2026,-46.99,69594085-13ec-4d1a-a0de-4299d4244642,Compra no débito';
+
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    response.setHeader('Content-Disposition', 'attachment; filename="modelo_importacao_financas.csv"');
+    return response.send(csvTemplate);
   }
 
   // ===== STATISTICS =====

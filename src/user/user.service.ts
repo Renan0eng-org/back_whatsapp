@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { Prisma } from 'generated/prisma';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/database/prisma.service'; // Ajuste o caminho
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';

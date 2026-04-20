@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { ExpenseCategoryEnum } from 'generated/prisma';
+import { ExpenseCategoryEnum } from '@prisma/client';
 
 export class CreateExpenseCategoryDto {
   @IsString()

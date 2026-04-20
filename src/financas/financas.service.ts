@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ExpenseCategoryEnum } from 'generated/prisma';
+import { createHash } from 'crypto';
+import { mkdir, writeFile } from 'fs/promises';
+import { join } from 'path';
+import { ExpenseCategoryEnum } from '@prisma/client';
 import { PrismaService } from 'src/database/prisma.service';
 import {
     ClassifyTransactionDto,
@@ -414,8 +417,17 @@ export class FinancasService {
 
   // ===== CSV IMPORT =====
 
-  async importTransactionsFromCsv(userId: string, fileContent: string) {
+  private normalizeCsvHeader(value: string) {
+    return value
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  private parseCsvRows(fileContent: string) {
     const lines = fileContent
+      .replace(/\r/g, '')
       .split('\n')
       .filter((line) => line.trim().length > 0);
 
@@ -425,81 +437,291 @@ export class FinancasService {
 
     const headers = lines[0]
       .split(',')
-      .map((h) => h.trim().toLowerCase());
+      .map((h) => this.normalizeCsvHeader(h));
 
     const dataIndex = {
       data: headers.indexOf('data'),
       valor: headers.indexOf('valor'),
       identificador: headers.indexOf('identificador'),
-      descrição: headers.indexOf('descrição'),
+      descricao: headers.indexOf('descricao'),
     };
 
     if (
       dataIndex.data === -1 ||
       dataIndex.valor === -1 ||
-      dataIndex.descrição === -1
+      dataIndex.descricao === -1
     ) {
       throw new BadRequestException(
         'Arquivo CSV deve conter as colunas: Data, Valor, Descrição',
       );
     }
 
-    const transactions: any[] = [];
+    const parsedRows: Array<{
+      rowIndex: number;
+      date: Date;
+      value: number;
+      description: string;
+      externalId: string | null;
+    }> = [];
+
     for (let i = 1; i < lines.length; i++) {
       const parts = lines[i].split(',');
 
       const dateStr = parts[dataIndex.data]?.trim();
       const valorStr = parts[dataIndex.valor]?.trim();
-      const descricao = parts[dataIndex.descrição]?.trim();
-      const externalId = parts[dataIndex.identificador]?.trim();
+      const descricao = parts[dataIndex.descricao]?.trim();
+      const externalId = parts[dataIndex.identificador]?.trim() || null;
 
       if (!dateStr || !valorStr || !descricao) continue;
 
-      // Parse date in format DD/MM/YYYY
       const [day, month, year] = dateStr.split('/');
       if (!day || !month || !year) continue;
 
       const date = new Date(`${year}-${month}-${day}`);
       if (isNaN(date.getTime())) continue;
 
-      const valor = parseFloat(valorStr);
-      if (isNaN(valor)) continue;
+      const value = parseFloat(valorStr);
+      if (isNaN(value)) continue;
 
-      // Check if transaction already exists
-      if (externalId) {
-        const existing = await this.prisma.transaction.findUnique({
-          where: { externalId },
-        });
-
-        if (existing) continue; // Skip if already imported
-      }
-
-      transactions.push({
+      parsedRows.push({
+        rowIndex: i + 1,
         date,
-        value: valor,
+        value,
         description: descricao,
-        externalId: externalId || null,
-        userId,
-        isClassified: false,
-        metadata: { imported_at: new Date().toISOString() },
+        externalId,
       });
     }
 
-    if (transactions.length === 0) {
-      throw new BadRequestException(
-        'Nenhuma transação válida foi encontrada no arquivo',
-      );
+    if (parsedRows.length === 0) {
+      throw new BadRequestException('Nenhuma transação válida foi encontrada no arquivo');
     }
 
-    // Batch insert
-    const result = await this.prisma.transaction.createMany({
-      data: transactions,
+    return parsedRows;
+  }
+
+  async importTransactionsFromCsv(
+    userId: string,
+    input: {
+      originalName: string;
+      mimeType?: string;
+      fileSize: number;
+      fileContent: string;
+    },
+  ) {
+    const { originalName, mimeType, fileSize, fileContent } = input;
+    const parsedRows = this.parseCsvRows(fileContent);
+    const now = new Date();
+    const contentHash = createHash('sha256').update(fileContent, 'utf8').digest('hex');
+
+    const storageDir = join(process.cwd(), 'storage', 'financas-imports', userId);
+    await mkdir(storageDir, { recursive: true });
+
+    const storedName = `${now.getTime()}_${contentHash.slice(0, 12)}.csv`;
+    const storagePath = join(storageDir, storedName);
+    await writeFile(storagePath, fileContent, 'utf8');
+
+    const importedFile = await this.prisma.importedCsvFile.create({
+      data: {
+        userId,
+        originalName,
+        storedName,
+        storagePath,
+        mimeType,
+        fileSize,
+        contentHash,
+      },
+    });
+
+    const hasPreviousBatch = await this.prisma.transactionImportBatch.findFirst({
+      where: {
+        userId,
+        importedFile: {
+          contentHash,
+        },
+      },
+      select: { idImportBatch: true },
+    });
+
+    const batch = await this.prisma.transactionImportBatch.create({
+      data: {
+        userId,
+        importedFileId: importedFile.idImportedFile,
+        batchType: hasPreviousBatch ? 'REIMPORT' : 'IMPORT',
+      },
+    });
+
+    let importedCount = 0;
+    let restoredFromTrashCount = 0;
+    let skippedCount = 0;
+
+    for (const row of parsedRows) {
+      const existing = row.externalId
+        ? await this.prisma.transaction.findFirst({
+          where: {
+            userId,
+            externalId: row.externalId,
+          },
+        })
+        : await this.prisma.transaction.findFirst({
+          where: {
+            userId,
+            date: row.date,
+            value: row.value,
+            description: row.description,
+          },
+        });
+
+      if (existing) {
+        if (existing.deletedAt && existing.isClassified) {
+          await this.prisma.transaction.update({
+            where: { idTransaction: existing.idTransaction },
+            data: {
+              deletedAt: null,
+              importBatchId: batch.idImportBatch,
+              metadata: {
+                ...((existing.metadata as any) || {}),
+                imported_at: now.toISOString(),
+                import_row: row.rowIndex,
+                import_file_hash: contentHash,
+              },
+            },
+          });
+          restoredFromTrashCount += 1;
+        } else {
+          skippedCount += 1;
+        }
+        continue;
+      }
+
+      await this.prisma.transaction.create({
+        data: {
+          date: row.date,
+          value: row.value,
+          description: row.description,
+          externalId: row.externalId,
+          userId,
+          isClassified: false,
+          importBatchId: batch.idImportBatch,
+          metadata: {
+            imported_at: now.toISOString(),
+            import_row: row.rowIndex,
+            import_file_hash: contentHash,
+          },
+        },
+      });
+      importedCount += 1;
+    }
+
+    await this.prisma.transactionImportBatch.update({
+      where: { idImportBatch: batch.idImportBatch },
+      data: {
+        importedCount,
+        restoredFromTrashCount,
+        skippedCount,
+      },
     });
 
     return {
       success: true,
-      imported: result.count,
-      message: `${result.count} transação(ões) importada(s) com sucesso`,
+      importBatchId: batch.idImportBatch,
+      imported: importedCount,
+      restoredFromTrash: restoredFromTrashCount,
+      skipped: skippedCount,
+      message: `${importedCount} transação(ões) importada(s), ${restoredFromTrashCount} restaurada(s) e ${skippedCount} ignorada(s).`,
+    };
+  }
+
+  async getImportHistory(userId: string) {
+    return this.prisma.transactionImportBatch.findMany({
+      where: { userId },
+      include: {
+        importedFile: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async revertImportBatch(userId: string, batchId: string) {
+    const batch = await this.prisma.transactionImportBatch.findUnique({
+      where: { idImportBatch: batchId },
+      include: {
+        importedFile: true,
+      },
+    });
+
+    if (!batch || batch.userId !== userId) {
+      throw new NotFoundException('Importação não encontrada');
+    }
+
+    if (batch.status === 'REVERTED') {
+      throw new BadRequestException('Esta importação já foi revertida');
+    }
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        userId,
+        importBatchId: batch.idImportBatch,
+        deletedAt: null,
+      },
+      select: {
+        idTransaction: true,
+        isClassified: true,
+      },
+    });
+
+    let movedToTrashCount = 0;
+    let deletedCount = 0;
+
+    for (const transaction of transactions) {
+      if (transaction.isClassified) {
+        await this.prisma.transaction.update({
+          where: { idTransaction: transaction.idTransaction },
+          data: { deletedAt: new Date() },
+        });
+        movedToTrashCount += 1;
+      } else {
+        await this.prisma.loanPayment.deleteMany({
+          where: { transactionId: transaction.idTransaction },
+        });
+        await this.prisma.transaction.delete({
+          where: { idTransaction: transaction.idTransaction },
+        });
+        deletedCount += 1;
+      }
+    }
+
+    await this.prisma.transactionImportBatch.update({
+      where: { idImportBatch: batch.idImportBatch },
+      data: {
+        status: 'REVERTED',
+        revertedAt: new Date(),
+        movedToTrashCount,
+        deletedCount,
+      },
+    });
+
+    return {
+      success: true,
+      movedToTrashCount,
+      deletedCount,
+      message: `Reversão concluída. ${movedToTrashCount} classificada(s) enviada(s) para lixeira e ${deletedCount} não classificada(s) removida(s).`,
+    };
+  }
+
+  async getImportBatchFile(userId: string, batchId: string) {
+    const batch = await this.prisma.transactionImportBatch.findUnique({
+      where: { idImportBatch: batchId },
+      include: { importedFile: true },
+    });
+
+    if (!batch || batch.userId !== userId) {
+      throw new NotFoundException('Importação não encontrada');
+    }
+
+    return {
+      filePath: batch.importedFile.storagePath,
+      fileName: batch.importedFile.originalName,
+      mimeType: batch.importedFile.mimeType || 'text/csv',
     };
   }
 
